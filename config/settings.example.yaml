@@ -22,3 +22,6 @@ ollama:
 paths:
   output: "output"
   music: "data/music"
+
+voice:
+  model: "data/voices/en_US-lessac-medium.onnx"

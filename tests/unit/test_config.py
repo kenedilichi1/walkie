@@ -97,3 +97,15 @@ def test_load_quotes_falls_back_when_empty(tmp_path):
 def test_load_user_plan_missing(tmp_path):
     with pytest.raises(ConfigError, match="walkie wizard"):
         config.load_user_plan(tmp_path / "user_plan.json")
+
+
+def test_voice_model_defaults_when_section_missing(tmp_path):
+    settings = config.load_settings(write_settings(tmp_path, VALID_YAML))
+    assert settings.voice_model.is_absolute()
+    assert str(settings.voice_model).endswith("data/voices/en_US-lessac-medium.onnx")
+
+
+def test_voice_model_reads_settings_override(tmp_path):
+    text = VALID_YAML + 'voice:\n  model: "data/voices/custom.onnx"\n'
+    settings = config.load_settings(write_settings(tmp_path, text))
+    assert str(settings.voice_model).endswith("data/voices/custom.onnx")

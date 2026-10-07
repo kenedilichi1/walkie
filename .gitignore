@@ -17,6 +17,7 @@ cache/
 data/music/
 data/osm/
 data/calendar/
+data/voices/
 .ollama/
 
 # local secrets / machine-specific
