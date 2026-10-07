@@ -23,8 +23,12 @@ Pipeline order (each stage reads only config/, data/, and prior stage output/):
    quote from `config/quotes.txt`; `walkie serve` puts `output/` on the LAN
    (landing page at `/` lists today_plan.json + walk.gpx + walk_audio.mp3)
    so the phone downloads the files and imports the GPX into OsmAnd
+8. `walkie run` — integration pipeline (cron entry point): steps 3+4 always,
+   reminders (7) next, then — only once `output/today_plan.json` exists —
+   route + voice (5-6), rebuilding only stale outputs (`--force` resets all).
+   Cron: `* * * * * cd <repo> && .venv/bin/walkie run >> output/cron.log 2>&1`
 
-Entry points: `make wizard|region|suggest|plan|route|voice|remind|daemon|serve`
+Entry points: `make wizard|region|suggest|plan|route|voice|remind|daemon|run|serve`
 — all of them run `python -m walkie <cmd>` (or the `walkie` console script
 after `pip install -e .`).
 
@@ -42,6 +46,7 @@ Code layout (`src/walkie/`):
 - `routing/` — OSM extract -> OSMnx street graph -> closed loop -> walk.gpx
 - `media/` — GPX turn narration (Piper TTS, voice-only MP3)
 - `sync/` — desktop notification bridge (plyer + quote) and the LAN server
+- `pipeline.py` — `walkie run`: chains suggest -> plan -> remind -> route -> voice
 - `suggest/` — prompts, proposals, reminders
 - `ui/` — setup wizard, quick-adjust dialog, shared widgets
 - `region.py` — Geofabrik extract detection + download

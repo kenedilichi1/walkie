@@ -57,6 +57,14 @@ def test_parser_serve_port():
     assert args.port == 9999
 
 
+def test_parser_run_force():
+    args = cli.build_parser().parse_args(["run"])
+    assert args.command == "run"
+    assert args.force is False
+    args = cli.build_parser().parse_args(["run", "--force"])
+    assert args.force is True
+
+
 def test_main_exit_codes(monkeypatch):
     from walkie import config, region
 
