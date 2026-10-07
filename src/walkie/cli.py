@@ -4,6 +4,7 @@
     walkie region [--dry-run ...]     detect location, fetch OSM extract
     walkie suggest [--edit|--force]   build today's walk proposal
     walkie plan [--force-new]         build today's plan (decision engine)
+    walkie route [--minutes N]        build today's walking loop -> walk.gpx
     walkie voice [--gpx PATH]         narrate route turns -> walk_audio.mp3
     walkie remind                     fire due reminders once
     walkie daemon                     loop reminder checks until approved
@@ -18,6 +19,7 @@ from pathlib import Path
 from walkie import config, region
 from walkie.log import get_logger, setup
 from walkie.media.voice import VoiceError
+from walkie.routing import RouteError
 
 log = get_logger("cli")
 
@@ -57,6 +59,18 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("remind", help="fire due reminders once, then exit")
     sub.add_parser("daemon", help="loop reminder checks until approved")
+
+    route_parser = sub.add_parser(
+        "route", help="build today's walking loop -> output/routes/walk.gpx"
+    )
+    route_parser.add_argument(
+        "--minutes", type=int,
+        help="loop duration in minutes (default: today's plan)",
+    )
+    route_parser.add_argument(
+        "--refresh", action="store_true",
+        help="re-scan the OSM extract (ignore the street-graph cache)",
+    )
 
     voice_parser = sub.add_parser(
         "voice", help="narrate route turns -> output/audio/walk_audio.mp3"
@@ -132,6 +146,22 @@ def cmd_plan(args: argparse.Namespace) -> None:
     )
 
 
+def cmd_route(args: argparse.Namespace) -> None:
+    from walkie.routing.builder import build_route
+
+    settings = config.load_settings()
+    if settings.pbf is None:
+        raise config.ConfigError("no OSM extract configured — run: make region")
+    build_route(
+        settings.pbf,
+        settings.lat,
+        settings.lon,
+        settings.timezone,
+        minutes=args.minutes,
+        refresh=args.refresh,
+    )
+
+
 def cmd_voice(args: argparse.Namespace) -> None:
     from walkie.media.voice import build_walk_audio
 
@@ -157,6 +187,7 @@ HANDLERS: dict[str, Callable[[argparse.Namespace], None]] = {
     "region": cmd_region,
     "suggest": cmd_suggest,
     "plan": cmd_plan,
+    "route": cmd_route,
     "voice": cmd_voice,
     "remind": cmd_remind,
     "daemon": cmd_daemon,
@@ -169,7 +200,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         HANDLERS[args.command](args)
-    except (config.ConfigError, region.RegionError, VoiceError) as exc:
+    except (config.ConfigError, region.RegionError, VoiceError, RouteError) as exc:
         log.error(f"error: {exc}")
         return 1
     except KeyboardInterrupt:

@@ -12,14 +12,17 @@ Pipeline order (each stage reads only config/, data/, and prior stage output/):
    weather, daylight) -> one local LLM call -> validated
    `output/plans/plan.json` (falls back to the inputs when the model is
    unreachable or replies garbage)
-5. Route builder + GPX export -> `output/routes/walk.gpx`
+5. `walkie route` — offline loop builder: one scan of the local .pbf
+   (street graph cached in `cache/routes/`) -> closed start-and-back-to-start
+   loop sized to today's duration -> `output/routes/walk.gpx` (timestamps
+   paced to fit the walk window; load it in OsmAnd)
 6. `walkie voice` — read `output/routes/walk.gpx`, narrate the turns with
    local Piper TTS -> `output/audio/walk_audio.mp3` (spoken cues only — no
    playlist matching; play your own music alongside it)
 7. Sync — OS notification + local file drop to phone
 
-Entry points: `make wizard|region|suggest|plan|voice|remind|daemon` — all of
-them run `python -m walkie <cmd>` (or the `walkie` console script after
+Entry points: `make wizard|region|suggest|plan|route|voice|remind|daemon` —
+all of them run `python -m walkie <cmd>` (or the `walkie` console script after
 `pip install -e .`).
 
 Code layout (`src/walkie/`):
@@ -28,11 +31,12 @@ Code layout (`src/walkie/`):
 - `config.py` — path constants + validated settings (loud `ConfigError`)
 - `models.py` — `UserPlan` / `Weather` / `Proposal` / `TodayPlan` dataclasses
 - `storage.py` — atomic JSON read/write
-- `log.py`, `clock.py` — stderr logging, local wall-clock
+- `log.py`, `clock.py`, `geo.py` — stderr logging, local wall-clock, haversine
 - `llm.py` — the single Ollama client (system + user messages)
 - `weather.py` — Open-Meteo fetch, staleness cache, prompt fingerprint
 - `daylight.py` — sunrise/sunset/day length (astral, offline)
 - `ai/` — planning system prompt + decision engine (plan.json)
+- `routing/` — OSM extract -> OSMnx street graph -> closed loop -> walk.gpx
 - `media/` — GPX turn narration (Piper TTS, voice-only MP3)
 - `suggest/` — prompts, proposals, reminders
 - `ui/` — setup wizard, quick-adjust dialog, shared widgets
