@@ -175,7 +175,3 @@ def run_setup() -> int:
     )
     log.info(f"Saved plan to {config.USER_PLAN_PATH}")
     return 0
-
-
-if __name__ == "__main__":
-    sys.exit(run_setup())

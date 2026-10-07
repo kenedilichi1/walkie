@@ -12,8 +12,7 @@ echo "==> Creating venv"
 python3 -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip
-pip install -r requirements.txt
-pip install -e .
+pip install -e ".[dev]"
 
 echo "==> Checking Ollama"
 if ! command -v ollama >/dev/null 2>&1; then
@@ -23,7 +22,7 @@ fi
 ollama pull llama3.2 || ollama pull phi3.5-mini
 
 echo "==> Fetching OSM region extract"
-if ! python scripts/fetch_region.py; then
+if ! python -m walkie region; then
   echo "Region fetch failed (offline or detection issue). Run later: make region"
 fi
 
