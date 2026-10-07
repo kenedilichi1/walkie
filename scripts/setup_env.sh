@@ -22,4 +22,9 @@ if ! command -v ollama >/dev/null 2>&1; then
 fi
 ollama pull llama3.2 || ollama pull phi3.5-mini
 
+echo "==> Fetching OSM region extract"
+if ! python scripts/fetch_region.py; then
+  echo "Region fetch failed (offline or detection issue). Run later: make region"
+fi
+
 echo "==> Done. Activate with: source .venv/bin/activate"

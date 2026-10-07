@@ -1,13 +1,21 @@
-.PHONY: setup test run clean
+PYTHON := $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
+
+.PHONY: setup region wizard test run clean
 
 setup:
 	bash scripts/setup_env.sh
 
+region:
+	$(PYTHON) scripts/fetch_region.py
+
+wizard:
+	$(PYTHON) setup_gui.py
+
 test:
-	python -m pytest -q
+	$(PYTHON) -m pytest -q
 
 run:
-	python -m main
+	$(PYTHON) -m main
 
 clean:
 	rm -rf output/* .pytest_cache src/*.egg-info
