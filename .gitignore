@@ -22,6 +22,7 @@ data/calendar/
 # local secrets / machine-specific
 config/*
 !config/*.example.*
+!config/quotes.txt
 .env
 .env.*
 !.env.example
