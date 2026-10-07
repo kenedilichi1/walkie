@@ -13,7 +13,7 @@ walkie/
 ├── config/          # settings.yaml (region, paths), user_plan.json, quotes.txt
 ├── data/            # inputs: .pbf extracts, piper voices/, music/ (never written by the app)
 ├── src/walkie/      # all code (installable via src/ layout)
-│   ├── cli.py       # walkie wizard|region|suggest|plan|route|voice|remind|daemon|serve
+│   ├── cli.py       # walkie wizard|region|suggest|plan|route|voice|remind|daemon|run|serve
 │   ├── config.py    # paths + validated settings (ConfigError)
 │   ├── models.py    # UserPlan / Weather / Proposal / TodayPlan dataclasses
 │   ├── storage.py   # atomic JSON helpers
@@ -21,6 +21,7 @@ walkie/
 │   ├── weather.py   # Open-Meteo fetch + staleness-aware cache
 │   ├── daylight.py  # sunrise/sunset/day length (astral, offline)
 │   ├── geo.py       # shared haversine
+│   ├── pipeline.py  # walkie run: the integration chain (cron entry)
 │   ├── ai/          # planning prompt + decision engine (plan.json)
 │   ├── routing/     # OSM extract -> street graph -> closed loop -> walk.gpx
 │   ├── media/       # GPX turn narration (Piper TTS, voice-only mp3)
@@ -46,6 +47,7 @@ make plan         # AI decision engine -> output/plans/plan.json
 make route        # offline walking loop -> output/routes/walk.gpx (OsmAnd)
 make voice        # narrate route turns -> output/audio/walk_audio.mp3
 make daemon       # reminders until today's walk is approved
+make run          # full pipeline: suggest -> plan -> remind -> route -> voice
 make serve        # phone downloads today's files over local WiFi
 make test         # pytest
 make lint         # ruff
@@ -60,5 +62,12 @@ walkie suggest --edit   # quick-adjust today's walk
 walkie route            # rebuild today's loop (--minutes N, --refresh)
 walkie voice            # voice cues for output/routes/walk.gpx (own music: your player)
 walkie remind           # fire due reminders once (cron-friendly)
+walkie run              # the whole pipeline --force regenerates everything
 walkie serve            # LAN server: phone gets plan + gpx + mp3 (--port N)
+```
+
+Schedule it with cron (cheap: fresh outputs are skipped, stale ones rebuilt):
+
+```bash
+* * * * * cd /path/to/walkie && .venv/bin/walkie run >> output/cron.log 2>&1
 ```

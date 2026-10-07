@@ -8,6 +8,7 @@
     walkie voice [--gpx PATH]         narrate route turns -> walk_audio.mp3
     walkie remind                     fire due reminders once
     walkie daemon                     loop reminder checks until approved
+    walkie run [--force]              full pipeline (cron entry point)
     walkie serve [--port N]           serve today's files to your phone (LAN)
 """
 
@@ -88,6 +89,14 @@ def build_parser() -> argparse.ArgumentParser:
     serve_parser.add_argument(
         "--port", type=int, default=8000,
         help="port to listen on (default: 8000)",
+    )
+
+    run_parser = sub.add_parser(
+        "run", help="full pipeline: suggest -> plan -> remind -> route -> voice"
+    )
+    run_parser.add_argument(
+        "--force", action="store_true",
+        help="regenerate proposal, plan, route and voice even if fresh",
     )
     return parser
 
@@ -198,6 +207,13 @@ def cmd_serve(args: argparse.Namespace) -> None:
     serve(port=args.port)
 
 
+def cmd_run(args: argparse.Namespace) -> None:
+    from walkie.pipeline import run
+
+    for action in run(force=args.force):
+        log.info(action)
+
+
 HANDLERS: dict[str, Callable[[argparse.Namespace], None]] = {
     "wizard": cmd_wizard,
     "region": cmd_region,
@@ -208,6 +224,7 @@ HANDLERS: dict[str, Callable[[argparse.Namespace], None]] = {
     "remind": cmd_remind,
     "daemon": cmd_daemon,
     "serve": cmd_serve,
+    "run": cmd_run,
 }
 
 
