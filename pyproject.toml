@@ -20,6 +20,7 @@ dependencies = [
     "plyer",
     "pyyaml",
     "PyQt6",
+    "pync",
 ]
 
 [project.scripts]
