@@ -1,8 +1,10 @@
 import pytest
 
 from walkie.models import (
+    Daylight,
     Intensity,
     LocationType,
+    Plan,
     Proposal,
     TodayPlan,
     UserPlan,
@@ -95,3 +97,45 @@ def test_weather_from_partial_dict():
     assert weather.temperature_2m == pytest.approx(27.8)
     assert weather.temperature_2m_max is None
     assert weather.fetched_at == 0
+
+
+def test_plan_roundtrip_and_clean_json():
+    import json
+
+    plan = Plan(
+        for_date="2026-10-07",
+        window_start="17:00",
+        window_end="17:45",
+        duration_minutes=45,
+        location_type=LocationType.SUN,
+        intensity=Intensity.BRISK,
+        area="Riverside",
+        sunrise="06:14",
+        sunset="18:15",
+        daylight_minutes=721,
+        weather_summary="overcast",
+        reason="rain at noon",
+        route_notes="ridge loop",
+        source="llm",
+        created_at="2026-10-07T09:00:00",
+    )
+    assert Plan.from_dict(plan.to_dict()) == plan
+    assert Plan.from_dict(json.loads(json.dumps(plan.to_dict()))) == plan
+
+
+def test_plan_from_dict_defaults_on_missing_or_bad_values():
+    plan = Plan.from_dict(
+        {"duration_minutes": "soon", "location_type": "beach", "source": "x"}
+    )
+    assert plan.duration_minutes == 30
+    assert plan.location_type is LocationType.SHADE
+    assert plan.weather_fingerprint == "unavailable"
+    assert plan.sunrise is None
+
+
+def test_daylight_roundtrip_and_partial():
+    day = Daylight(for_date="2026-10-07", sunrise="06:14", sunset="18:15",
+                   daylight_minutes=721)
+    assert Daylight.from_dict(day.to_dict()) == day
+    empty = Daylight.from_dict({})
+    assert empty.sunrise is None and empty.daylight_minutes == 0

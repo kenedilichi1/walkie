@@ -124,6 +124,30 @@ def _opt_float(value: Any) -> float | None:
         return None
 
 
+def _opt_str(value: Any) -> str | None:
+    return value if isinstance(value, str) else None
+
+
+@dataclass(frozen=True)
+class Daylight:
+    for_date: str = ""
+    sunrise: str | None = None  # "HH:MM" local
+    sunset: str | None = None
+    daylight_minutes: int = 0
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Daylight:
+        return cls(
+            for_date=_str(data.get("for_date")),
+            sunrise=_opt_str(data.get("sunrise")),
+            sunset=_opt_str(data.get("sunset")),
+            daylight_minutes=_int(data.get("daylight_minutes"), 0),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {f.name: getattr(self, f.name) for f in fields(self)}
+
+
 @dataclass(frozen=True)
 class Proposal:
     suggested_time: str = ""
@@ -192,4 +216,57 @@ class TodayPlan(Proposal):
         data = super().to_dict()
         data["approved_at"] = self.approved_at
         data["approved_by"] = self.approved_by
+        return data
+
+
+@dataclass(frozen=True)
+class Plan:
+    """Output of the AI decision engine (output/plans/plan.json)."""
+
+    for_date: str = ""
+    window_start: str = ""  # "HH:MM"
+    window_end: str = ""  # computed: window_start + duration
+    duration_minutes: int = 30
+    location_type: LocationType = LocationType.SHADE
+    intensity: Intensity = Intensity.MODERATE
+    area: str = ""
+    sunrise: str | None = None
+    sunset: str | None = None
+    daylight_minutes: int = 0
+    weather_summary: str = ""
+    weather_fingerprint: str = "unavailable"
+    reason: str = ""
+    route_notes: str = ""
+    source: str = "fallback"  # llm | fallback
+    created_at: str = ""
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Plan:
+        return cls(
+            for_date=_str(data.get("for_date")),
+            window_start=_str(data.get("window_start")),
+            window_end=_str(data.get("window_end")),
+            duration_minutes=_int(data.get("duration_minutes"), 30),
+            location_type=_enum(
+                LocationType, data.get("location_type"), LocationType.SHADE
+            ),
+            intensity=_enum(Intensity, data.get("intensity"), Intensity.MODERATE),
+            area=_str(data.get("area")),
+            sunrise=_opt_str(data.get("sunrise")),
+            sunset=_opt_str(data.get("sunset")),
+            daylight_minutes=_int(data.get("daylight_minutes"), 0),
+            weather_summary=_str(data.get("weather_summary")),
+            weather_fingerprint=_str(
+                data.get("weather_fingerprint"), "unavailable"
+            ),
+            reason=_str(data.get("reason")),
+            route_notes=_str(data.get("route_notes")),
+            source=_str(data.get("source"), "fallback"),
+            created_at=_str(data.get("created_at")),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        data = {f.name: getattr(self, f.name) for f in fields(self)}
+        data["location_type"] = self.location_type.value
+        data["intensity"] = self.intensity.value
         return data

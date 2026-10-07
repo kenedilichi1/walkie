@@ -3,6 +3,7 @@
     walkie wizard                     one-time setup wizard
     walkie region [--dry-run ...]     detect location, fetch OSM extract
     walkie suggest [--edit|--force]   build today's walk proposal
+    walkie plan [--force-new]         build today's plan (decision engine)
     walkie remind                     fire due reminders once
     walkie daemon                     loop reminder checks until approved
 """
@@ -41,6 +42,14 @@ def build_parser() -> argparse.ArgumentParser:
     suggest_parser.add_argument(
         "--force-new", action="store_true",
         help="regenerate the proposal even if still valid",
+    )
+
+    plan_parser = sub.add_parser(
+        "plan", help="build today's plan (AI decision engine)"
+    )
+    plan_parser.add_argument(
+        "--force-new", action="store_true",
+        help="regenerate the plan even if still valid",
     )
 
     sub.add_parser("remind", help="fire due reminders once, then exit")
@@ -87,6 +96,31 @@ def cmd_suggest(args: argparse.Namespace) -> None:
         )
 
 
+def cmd_plan(args: argparse.Namespace) -> None:
+    from walkie import clock
+    from walkie.ai.planner import ensure_plan
+    from walkie.daylight import daylight_for
+    from walkie.models import Proposal
+    from walkie.storage import read_json
+    from walkie.weather import refresh_from_settings
+
+    settings = config.load_settings()
+    base_plan = config.load_user_plan()
+    weather = refresh_from_settings(settings)
+    daylight = daylight_for(
+        settings.lat, settings.lon, settings.timezone, on=clock.now().date()
+    )
+    proposal = None
+    proposal_data = read_json(config.PROPOSAL_PATH)
+    if proposal_data:
+        candidate = Proposal.from_dict(proposal_data)
+        if candidate.for_date == clock.now().date().isoformat():
+            proposal = candidate
+    ensure_plan(
+        base_plan, weather, daylight, proposal, force=args.force_new
+    )
+
+
 def cmd_remind(args: argparse.Namespace) -> None:
     from walkie.suggest.reminders import check_reminders
 
@@ -104,6 +138,7 @@ HANDLERS: dict[str, Callable[[argparse.Namespace], None]] = {
     "wizard": cmd_wizard,
     "region": cmd_region,
     "suggest": cmd_suggest,
+    "plan": cmd_plan,
     "remind": cmd_remind,
     "daemon": cmd_daemon,
 }

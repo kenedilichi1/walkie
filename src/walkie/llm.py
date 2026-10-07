@@ -17,6 +17,7 @@ def complete(
     *,
     max_tokens: int = 300,
     temperature: float = 0.3,
+    system: str | None = None,
     host: str | None = None,
     model: str | None = None,
 ) -> str | None:
@@ -25,10 +26,14 @@ def complete(
         default_host, default_model = config.load_ollama_config()
         host = host or default_host
         model = model or default_model
+    messages: list[dict[str, str]] = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": prompt})
     try:
         response = ollama.Client(host=host).chat(
             model=model,
-            messages=[{"role": "user", "content": prompt}],
+            messages=messages,
             options={"temperature": temperature, "num_predict": max_tokens},
         )
     except Exception as exc:  # noqa: BLE001 - local LLM is best-effort

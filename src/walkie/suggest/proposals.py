@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
@@ -16,7 +15,6 @@ from walkie.suggest.prompts import build_prompt
 from walkie.weather import weather_fingerprint, weather_line
 
 log = get_logger("suggest")
-TIME_RE = re.compile(r"^\d{1,2}:\d{2}$")
 
 LlmFn = Callable[[str], dict | None]
 
@@ -28,7 +26,7 @@ def parse_llm_json(text: str) -> dict | None:
         return None
     when = data.get("suggested_time")
     duration = data.get("duration_minutes")
-    if not isinstance(when, str) or not TIME_RE.match(when):
+    if not isinstance(when, str) or not clock.TIME_RE.match(when):
         return None
     if not isinstance(duration, int) or not 5 <= duration <= 180:
         return None

@@ -25,6 +25,12 @@ def test_parser_requires_command():
         cli.build_parser().parse_args([])
 
 
+def test_parser_plan_flags():
+    args = cli.build_parser().parse_args(["plan", "--force-new"])
+    assert args.command == "plan"
+    assert args.force_new is True
+
+
 def test_main_exit_codes(monkeypatch):
     from walkie import config, region
 

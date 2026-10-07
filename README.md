@@ -17,8 +17,10 @@ walkie/
 │   ├── config.py    # paths + validated settings (ConfigError)
 │   ├── models.py    # UserPlan / Weather / Proposal / TodayPlan dataclasses
 │   ├── storage.py   # atomic JSON helpers
-│   ├── llm.py       # the single Ollama client
+│   ├── llm.py       # the single Ollama client (system + user messages)
 │   ├── weather.py   # Open-Meteo fetch + staleness-aware cache
+│   ├── daylight.py  # sunrise/sunset/day length (astral, offline)
+│   ├── ai/          # planning prompt + decision engine (plan.json)
 │   ├── suggest/     # prompts / proposals / reminders
 │   ├── ui/          # setup wizard + quick-adjust dialog (PyQt6)
 │   ├── region.py    # Geofabrik OSM extract fetch
@@ -36,6 +38,7 @@ make setup        # venv + deps + Ollama model + region fetch
 make region       # re-detect location / fetch OSM extract
 make wizard       # one-time preference setup (PyQt)
 make suggest      # today's walk proposal (weather + local LLM)
+make plan         # AI decision engine -> output/plans/plan.json
 make daemon       # reminders until today's walk is approved
 make test         # pytest
 make lint         # ruff

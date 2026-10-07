@@ -9,10 +9,11 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from walkie import clock, config
+from walkie.clock import TIME_RE
 from walkie.log import get_logger
 from walkie.models import Proposal, TodayPlan, UserPlan, Weather
 from walkie.storage import read_json, write_json
-from walkie.suggest.proposals import TIME_RE, ensure_proposal
+from walkie.suggest.proposals import ensure_proposal
 from walkie.weather import refresh_from_settings
 
 log = get_logger("suggest")
