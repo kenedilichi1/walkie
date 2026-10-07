@@ -8,9 +8,6 @@ location:
   timezone: "UTC"
   start_place: "home"   # home | office | park | coffee
 
-calendar:
-  ics_path: "data/calendar/work.ics"
-
 weather:
   cache: "cache/weather_today.json"
   forecast_url: "https://api.open-meteo.com/v1/forecast"
@@ -21,7 +18,6 @@ ollama:
 
 paths:
   output: "output"
-  music: "data/music"
 
 voice:
   model: "data/voices/en_US-lessac-medium.onnx"
