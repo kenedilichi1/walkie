@@ -2,10 +2,9 @@
 
 Offline-first walk planner. Asks your preferences once, checks local weather,
 picks today's best walk window with a local LLM (Ollama), reminds you before
-it starts — and (later steps) builds a walking loop from an offline OSM
-extract, narrates the turns with local voice cues (play your own music
-alongside it), and drops everything to your phone over local WiFi. No cloud
-required after setup.
+it starts — and builds a walking loop from an offline OSM extract, narrates
+the turns with local voice cues (play your own music alongside it), and drops
+everything to your phone over local WiFi. No cloud required after setup.
 
 ## Layout
 
@@ -14,7 +13,7 @@ walkie/
 ├── config/          # settings.yaml (region, paths), user_plan.json, quotes.txt
 ├── data/            # inputs: .pbf extracts, piper voices/, music/ (never written by the app)
 ├── src/walkie/      # all code (installable via src/ layout)
-│   ├── cli.py       # walkie wizard|region|suggest|plan|route|voice|remind|daemon
+│   ├── cli.py       # walkie wizard|region|suggest|plan|route|voice|remind|daemon|serve
 │   ├── config.py    # paths + validated settings (ConfigError)
 │   ├── models.py    # UserPlan / Weather / Proposal / TodayPlan dataclasses
 │   ├── storage.py   # atomic JSON helpers
@@ -26,6 +25,7 @@ walkie/
 │   ├── routing/     # OSM extract -> street graph -> closed loop -> walk.gpx
 │   ├── media/       # GPX turn narration (Piper TTS, voice-only mp3)
 │   ├── suggest/     # prompts / proposals / reminders
+│   ├── sync/        # quote notifications (plyer) + LAN server for the phone
 │   ├── ui/          # setup wizard + quick-adjust dialog (PyQt6)
 │   ├── region.py    # Geofabrik OSM extract fetch
 │   └── log.py, clock.py, __main__.py
@@ -46,6 +46,7 @@ make plan         # AI decision engine -> output/plans/plan.json
 make route        # offline walking loop -> output/routes/walk.gpx (OsmAnd)
 make voice        # narrate route turns -> output/audio/walk_audio.mp3
 make daemon       # reminders until today's walk is approved
+make serve        # phone downloads today's files over local WiFi
 make test         # pytest
 make lint         # ruff
 make typecheck    # mypy
@@ -59,4 +60,5 @@ walkie suggest --edit   # quick-adjust today's walk
 walkie route            # rebuild today's loop (--minutes N, --refresh)
 walkie voice            # voice cues for output/routes/walk.gpx (own music: your player)
 walkie remind           # fire due reminders once (cron-friendly)
+walkie serve            # LAN server: phone gets plan + gpx + mp3 (--port N)
 ```

@@ -20,7 +20,7 @@ dependencies = [
     "plyer",
     "pyyaml",
     "PyQt6",
-    "pync; sys_platform == 'darwin'",
+    "pyobjus; sys_platform == 'darwin'",
 ]
 
 [project.optional-dependencies]

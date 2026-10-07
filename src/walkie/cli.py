@@ -8,6 +8,7 @@
     walkie voice [--gpx PATH]         narrate route turns -> walk_audio.mp3
     walkie remind                     fire due reminders once
     walkie daemon                     loop reminder checks until approved
+    walkie serve [--port N]           serve today's files to your phone (LAN)
 """
 
 from __future__ import annotations
@@ -20,6 +21,7 @@ from walkie import config, region
 from walkie.log import get_logger, setup
 from walkie.media.voice import VoiceError
 from walkie.routing import RouteError
+from walkie.sync import SyncError
 
 log = get_logger("cli")
 
@@ -78,6 +80,14 @@ def build_parser() -> argparse.ArgumentParser:
     voice_parser.add_argument(
         "--gpx", type=Path, default=config.DEFAULT_WALK_GPX,
         help="GPX track to narrate (default: output/routes/walk.gpx)",
+    )
+
+    serve_parser = sub.add_parser(
+        "serve", help="LAN server: phone downloads today's files"
+    )
+    serve_parser.add_argument(
+        "--port", type=int, default=8000,
+        help="port to listen on (default: 8000)",
     )
     return parser
 
@@ -182,6 +192,12 @@ def cmd_daemon(args: argparse.Namespace) -> None:
     run_daemon()
 
 
+def cmd_serve(args: argparse.Namespace) -> None:
+    from walkie.sync.server import serve
+
+    serve(port=args.port)
+
+
 HANDLERS: dict[str, Callable[[argparse.Namespace], None]] = {
     "wizard": cmd_wizard,
     "region": cmd_region,
@@ -191,6 +207,7 @@ HANDLERS: dict[str, Callable[[argparse.Namespace], None]] = {
     "voice": cmd_voice,
     "remind": cmd_remind,
     "daemon": cmd_daemon,
+    "serve": cmd_serve,
 }
 
 
@@ -200,7 +217,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         HANDLERS[args.command](args)
-    except (config.ConfigError, region.RegionError, VoiceError, RouteError) as exc:
+    except (config.ConfigError, region.RegionError, VoiceError, RouteError,
+            SyncError) as exc:
         log.error(f"error: {exc}")
         return 1
     except KeyboardInterrupt:

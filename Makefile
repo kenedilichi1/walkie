@@ -1,6 +1,6 @@
 PYTHON := $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 
-.PHONY: setup region wizard suggest plan route voice remind daemon test lint typecheck clean
+.PHONY: setup region wizard suggest plan route voice remind daemon serve test lint typecheck clean
 
 setup:
 	bash scripts/setup_env.sh
@@ -28,6 +28,9 @@ remind:
 
 daemon:
 	$(PYTHON) -m walkie daemon
+
+serve:
+	$(PYTHON) -m walkie serve
 
 test:
 	$(PYTHON) -m pytest -q
