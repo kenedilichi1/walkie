@@ -10,3 +10,5 @@ librosa
 plyer
 pyyaml
 PyQt6
+pync
+pytest
