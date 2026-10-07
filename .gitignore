@@ -16,9 +16,7 @@ output/
 cache/
 
 # large local inputs / model weights
-data/music/
 data/osm/
-data/calendar/
 data/voices/
 .ollama/
 
