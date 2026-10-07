@@ -9,7 +9,7 @@ region:
 	$(PYTHON) scripts/fetch_region.py
 
 wizard:
-	$(PYTHON) setup_gui.py
+	$(PYTHON) -m walkie.ui.wizard
 
 test:
 	$(PYTHON) -m pytest -q
