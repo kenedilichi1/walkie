@@ -39,6 +39,16 @@ def test_parser_voice_defaults_to_walk_gpx(tmp_path):
     assert args.gpx == tmp_path / "a.gpx"
 
 
+def test_parser_route_flags():
+    args = cli.build_parser().parse_args(["route", "--minutes", "20", "--refresh"])
+    assert args.command == "route"
+    assert args.minutes == 20
+    assert args.refresh is True
+    args = cli.build_parser().parse_args(["route"])
+    assert args.minutes is None
+    assert args.refresh is False
+
+
 def test_main_exit_codes(monkeypatch):
     from walkie import config, region
 

@@ -109,3 +109,15 @@ def test_voice_model_reads_settings_override(tmp_path):
     text = VALID_YAML + 'voice:\n  model: "data/voices/custom.onnx"\n'
     settings = config.load_settings(write_settings(tmp_path, text))
     assert str(settings.voice_model).endswith("data/voices/custom.onnx")
+
+
+def test_pbf_none_when_region_missing(tmp_path):
+    settings = config.load_settings(write_settings(tmp_path, VALID_YAML))
+    assert settings.pbf is None
+
+
+def test_pbf_resolved_from_region_section(tmp_path):
+    text = 'region:\n  pbf: "data/osm/test.osm.pbf"\n' + VALID_YAML
+    settings = config.load_settings(write_settings(tmp_path, text))
+    assert settings.pbf is not None
+    assert str(settings.pbf).endswith("data/osm/test.osm.pbf")

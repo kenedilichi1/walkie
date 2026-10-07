@@ -29,9 +29,9 @@ PROPOSAL_PATH = OUTPUT_DIR / "proposal.json"
 TODAY_PLAN_PATH = OUTPUT_DIR / "today_plan.json"
 REMINDER_STATE_PATH = OUTPUT_DIR / "reminder_state.json"
 PLAN_PATH = OUTPUT_DIR / "plans" / "plan.json"
-AUDIO_DIR = OUTPUT_DIR / "audio"
-WALK_AUDIO_PATH = AUDIO_DIR / "walk_audio.mp3"
-DEFAULT_WALK_GPX = OUTPUT_DIR / "routes" / "walk.gpx"
+ROUTES_DIR = OUTPUT_DIR / "routes"
+WALK_AUDIO_PATH = OUTPUT_DIR / "audio" / "walk_audio.mp3"
+DEFAULT_WALK_GPX = ROUTES_DIR / "walk.gpx"
 
 DEFAULT_OLLAMA_HOST = "http://localhost:11434"
 DEFAULT_OLLAMA_MODEL = "llama3.2:3b"
@@ -39,6 +39,7 @@ DEFAULT_FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 DEFAULT_WEATHER_CACHE = "cache/weather_today.json"
 DEFAULT_QUOTE = "Stand up from your computer."
 DEFAULT_VOICE_MODEL = "data/voices/en_US-lessac-medium.onnx"
+WALKING_SPEED_MPS = 1.35
 
 
 class ConfigError(Exception):
@@ -55,6 +56,7 @@ class Settings:
     ollama_host: str
     ollama_model: str
     voice_model: Path
+    pbf: Path | None
 
 
 def _read_yaml(path: Path) -> dict:
@@ -88,6 +90,8 @@ def load_settings(path: Path = SETTINGS_PATH) -> Settings:
     weather_cfg = data.get("weather") or {}
     ollama_cfg = data.get("ollama") or {}
     voice_cfg = data.get("voice") or {}
+    region_cfg = data.get("region") or {}
+    pbf_raw = region_cfg.get("pbf")
 
     try:
         lat = float(location.get("lat", 0.0))
@@ -105,6 +109,7 @@ def load_settings(path: Path = SETTINGS_PATH) -> Settings:
         ollama_host=str(ollama_cfg.get("host") or DEFAULT_OLLAMA_HOST),
         ollama_model=str(ollama_cfg.get("model") or DEFAULT_OLLAMA_MODEL),
         voice_model=_resolve(str(voice_cfg.get("model") or DEFAULT_VOICE_MODEL)),
+        pbf=_resolve(str(pbf_raw)) if pbf_raw else None,
     )
 
 

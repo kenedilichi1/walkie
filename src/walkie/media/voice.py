@@ -24,11 +24,12 @@ import requests
 from gpxpy.gpx import GPXException
 
 from walkie import config
+from walkie.geo import haversine_m
 from walkie.log import get_logger
 
 log = get_logger("voice")
 
-WALKING_SPEED_MPS = 1.35
+WALKING_SPEED_MPS = config.WALKING_SPEED_MPS
 TURN_THRESHOLD_DEG = 40.0
 MIN_TURN_SPACING_M = 15.0
 START_TEXT = "Start of your walk. Follow the route."
@@ -81,15 +82,6 @@ class BuildResult:
 Synth = Callable[[str], tuple[AudioSpec, bytes]]
 
 
-def _haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    radius_m = 6_371_000.0
-    p1, p2 = math.radians(lat1), math.radians(lat2)
-    dp = p2 - p1
-    dl = math.radians(lon2 - lon1)
-    a = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
-    return 2 * radius_m * math.asin(math.sqrt(a))
-
-
 def _bearing_deg(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     p1, p2 = math.radians(lat1), math.radians(lat2)
     dl = math.radians(lon2 - lon1)
@@ -134,7 +126,7 @@ def _cumulative_m(
     cumulative = [0.0]
     for prev, curr in zip(points, points[1:], strict=False):
         cumulative.append(
-            cumulative[-1] + _haversine_m(prev[0], prev[1], curr[0], curr[1])
+            cumulative[-1] + haversine_m(prev[0], prev[1], curr[0], curr[1])
         )
     return cumulative
 
