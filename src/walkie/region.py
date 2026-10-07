@@ -1,17 +1,11 @@
-#!/usr/bin/env python3
 """Detect your location and download the matching Geofabrik OSM extract.
 
 One-time setup step: finds the most specific .pbf extract Geofabrik offers
 for where you are (sub-region like a state when available, else country),
 downloads it into data/osm/, and writes region + coordinates + timezone
 into config/settings.yaml.
-
-Usage:
-    python scripts/fetch_region.py                  # auto-detect via IP
-    python scripts/fetch_region.py --lat 0 --lon 0  # manual coords
-    python scripts/fetch_region.py --name Nairobi   # manual country name
-    python scripts/fetch_region.py --dry-run        # show plan, no download
 """
+
 from __future__ import annotations
 
 import argparse
@@ -21,9 +15,12 @@ from pathlib import Path
 
 import requests
 
-ROOT = Path(__file__).resolve().parents[1]
-PBF_DIR = ROOT / "data" / "osm"
-SETTINGS = ROOT / "config" / "settings.yaml"
+from walkie import config
+from walkie.log import get_logger
+
+log = get_logger("region")
+
+PBF_DIR = config.DATA_DIR / "osm"
 GEOFABRIK = "https://download.geofabrik.de"
 UA = {"User-Agent": "walkie-setup/0.1 (local OSM region fetch)"}
 
@@ -37,8 +34,8 @@ CONTINENT_FALLBACK = [
 ]
 
 
-def log(msg: str) -> None:
-    print(msg, file=sys.stderr)
+class RegionError(Exception):
+    """Setup problem; the message is user-facing."""
 
 
 def slugify(name: str) -> str:
@@ -64,12 +61,12 @@ def detect_location() -> tuple[float, float, str, str, str]:
             r.raise_for_status()
             lat, lon, country, code, tz = parse(r.json())
             if lat is not None and lon is not None and country:
-                log(f"Detected location: {lat}, {lon} ({country}) via {url}")
+                log.info(f"Detected location: {lat}, {lon} ({country}) via {url}")
                 return float(lat), float(lon), country, code.lower(), tz
         except Exception as exc:  # noqa: BLE001 - try next source
-            log(f"  {url} failed: {exc}")
-    sys.exit(
-        "error: could not detect location from IP. "
+            log.info(f"  {url} failed: {exc}")
+    raise RegionError(
+        "could not detect location from IP. "
         "Re-run with --lat/--lon (and optionally --name)."
     )
 
@@ -84,16 +81,22 @@ def geofabrik_continents() -> list[str]:
         if keep:
             return list(dict.fromkeys(keep))
     except Exception as exc:  # noqa: BLE001
-        log(f"  index scrape failed ({exc}); using built-in continent list")
+        log.info(f"  index scrape failed ({exc}); using built-in continent list")
     return CONTINENT_FALLBACK
 
 
 def reverse_region(lat: float, lon: float) -> str | None:
     """Best-effort sub-region (state/province) for more specific extracts."""
     try:
+        params: dict[str, str | float] = {
+            "format": "jsonv2",
+            "lat": lat,
+            "lon": lon,
+            "zoom": 5,
+        }
         r = requests.get(
             "https://nominatim.openstreetmap.org/reverse",
-            params={"format": "jsonv2", "lat": lat, "lon": lon, "zoom": 5},
+            params=params,
             headers=UA,
             timeout=10,
         )
@@ -104,10 +107,10 @@ def reverse_region(lat: float, lon: float) -> str | None:
             or addr.get("province") or addr.get("state_district")
         )
         if region:
-            log(f"Reverse geocode sub-region: {region}")
+            log.info(f"Reverse geocode sub-region: {region}")
         return region
     except Exception as exc:  # noqa: BLE001
-        log(f"  reverse geocode failed: {exc}")
+        log.info(f"  reverse geocode failed: {exc}")
         return None
 
 
@@ -168,24 +171,24 @@ def find_extract(
     )
     for extract_url, display_name in candidates:
         if url_exists(extract_url):
-            log(f"Found extract: {extract_url}")
+            log.info(f"Found extract: {extract_url}")
             return extract_url, display_name
 
-    sys.exit(
-        f"error: no Geofabrik extract found for {country_name!r} / "
+    raise RegionError(
+        f"no Geofabrik extract found for {country_name!r} / "
         f"{subregion_name!r}. Check {GEOFABRIK} manually and re-run with "
         "--name, or use --dry-run to debug."
     )
 
 
 def download(url: str, dest: Path) -> None:
-    log(f"Downloading {url} -> {dest}")
+    log.info(f"Downloading {url} -> {dest}")
     r = requests.get(url, headers=UA, stream=True, timeout=60)
     r.raise_for_status()
     total = int(r.headers.get("Content-Length") or 0)
     if total > 700 * 1024 * 1024:
-        log(f"  warning: {total / 1e6:.0f} MB is large; consider a "
-            "sub-region if your country is split on Geofabrik")
+        log.info(f"  warning: {total / 1e6:.0f} MB is large; consider a "
+                 "sub-region if your country is split on Geofabrik")
     done = 0
     with open(dest, "wb") as fh:
         for chunk in r.iter_content(chunk_size=1 << 20):
@@ -194,7 +197,7 @@ def download(url: str, dest: Path) -> None:
             if total:
                 print(f"\r  {done / 1e6:.0f} / {total / 1e6:.0f} MB",
                       end="", file=sys.stderr)
-    log(f"\nDownloaded {done / 1e6:.0f} MB")
+    log.info(f"\nDownloaded {done / 1e6:.0f} MB")
 
 
 def _format_coordinate(value: float) -> str:
@@ -228,7 +231,12 @@ def _replace_setting_line(
 
 
 def update_settings(
-    pbf_rel: str, region_name: str, lat: float, lon: float, tz: str
+    pbf_rel: str,
+    region_name: str,
+    lat: float,
+    lon: float,
+    tz: str,
+    settings_path: Path = config.SETTINGS_PATH,
 ) -> None:
     """Update known keys in config/settings.yaml, preserving comments."""
     replacements: dict[tuple[str, str], str] = {
@@ -240,26 +248,24 @@ def update_settings(
     }
     section: str | None = None
     out: list[str] = []
-    for line in SETTINGS.read_text().splitlines():
+    for line in settings_path.read_text().splitlines():
         # the regex only matches unindented lines, so these are section keys
         top_level_key = re.match(r"^([A-Za-z_][\w-]*):\s*(.*)$", line)
         if top_level_key:
             section = top_level_key.group(1)
         out.append(_replace_setting_line(line, section, replacements))
     if replacements:
-        log(f"  warning: keys not found in settings.yaml: {sorted(replacements)}")
-    SETTINGS.write_text("\n".join(out) + "\n")
-    log(f"Updated {SETTINGS.relative_to(ROOT)}")
+        log.warning(f"keys not found in settings.yaml: {sorted(replacements)}")
+    settings_path.write_text("\n".join(out) + "\n")
+    log.info(f"Updated {settings_path}")
 
 
-def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__)
+def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--lat", type=float, help="override latitude")
     parser.add_argument("--lon", type=float, help="override longitude")
     parser.add_argument("--name", help="override country/region name")
     parser.add_argument("--dry-run", action="store_true",
                         help="detect and plan, but do not download or write")
-    return parser.parse_args()
 
 
 def _resolve_location(
@@ -267,10 +273,10 @@ def _resolve_location(
 ) -> tuple[float, float, str, str, str]:
     """Return (lat, lon, country_name, country_code, timezone)."""
     if args.lat is not None and args.lon is not None:
-        log(f"Using manual coordinates: {args.lat}, {args.lon}")
+        log.info(f"Using manual coordinates: {args.lat}, {args.lon}")
         country_name = args.name or ""
         if not country_name:
-            sys.exit("error: --lat/--lon require --name as well")
+            raise RegionError("--lat/--lon require --name as well")
         return args.lat, args.lon, country_name, "", "UTC"
     lat, lon, country_name, country_code, timezone_name = detect_location()
     if args.name:
@@ -282,7 +288,7 @@ def _download_extract(extract_url: str, dest: Path) -> None:
     """Download unless already present; clean up partial files on failure."""
     PBF_DIR.mkdir(parents=True, exist_ok=True)
     if dest.exists() and dest.stat().st_size > 0:
-        log(f"Already downloaded: {dest} (delete to re-fetch)")
+        log.info(f"Already downloaded: {dest} (delete to re-fetch)")
         return
     partial = dest.with_suffix(dest.suffix + ".part")
     try:
@@ -293,8 +299,8 @@ def _download_extract(extract_url: str, dest: Path) -> None:
         raise
 
 
-def main() -> None:
-    args = _parse_args()
+def execute(args: argparse.Namespace) -> None:
+    """Run the fetch; raises RegionError with a user-facing message on failure."""
     lat, lon, country_name, country_code, timezone_name = _resolve_location(args)
 
     continents = geofabrik_continents()
@@ -311,20 +317,16 @@ def main() -> None:
     pbf_setting = f"data/osm/{pbf_filename}"
 
     if args.dry_run:
-        log(f"dry run: would download {extract_url} -> {dest}")
-        log(f"dry run: would set region={region_name!r}, lat={lat}, "
-            f"lon={lon}, tz={timezone_name}")
+        log.info(f"dry run: would download {extract_url} -> {dest}")
+        log.info(f"dry run: would set region={region_name!r}, lat={lat}, "
+                 f"lon={lon}, tz={timezone_name}")
         return
 
     _download_extract(extract_url, dest)
 
-    if SETTINGS.exists():
+    if config.SETTINGS_PATH.exists():
         update_settings(pbf_setting, region_name, lat, lon, timezone_name)
     else:
-        log(f"  warning: {SETTINGS} not found; set region manually")
+        log.warning(f"{config.SETTINGS_PATH} not found; set region manually")
 
-    log("Done. Region setup complete.")
-
-
-if __name__ == "__main__":
-    main()
+    log.info("Done. Region setup complete.")
