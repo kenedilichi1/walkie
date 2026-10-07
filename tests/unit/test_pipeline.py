@@ -13,7 +13,7 @@ from test_routing import LAT0, LON0, write_grid_pbf
 from walkie import config
 from walkie.media.voice import AudioSpec
 from walkie.models import UserPlan
-from walkie.pipeline import run
+from walkie.pipeline import PipelinePaths, run
 from walkie.storage import read_json, write_json
 
 FAKE_SYNTH = lambda text: (AudioSpec(22050, 2, 1), b"\x01\x00" * 1000)  # noqa: E731
@@ -45,28 +45,24 @@ def _today_plan(path: Path, when: str = "16:30", minutes: int = 11) -> None:
 
 
 def _run(tmp_path: Path, pbf: Path | None, *, today: bool, **kwargs):
-    paths = dict(
-        proposal_path=tmp_path / "proposal.json",
-        plan_path=tmp_path / "plans" / "plan.json",
-        today_path=tmp_path / "today_plan.json",
-        state_path=tmp_path / "reminder_state.json",
-        gpx_path=tmp_path / "routes" / "walk.gpx",
-        audio_path=tmp_path / "audio" / "walk_audio.mp3",
+    paths = PipelinePaths(
+        proposal=tmp_path / "proposal.json",
+        plan=tmp_path / "plans" / "plan.json",
+        today=tmp_path / "today_plan.json",
+        state=tmp_path / "reminder_state.json",
+        gpx=tmp_path / "routes" / "walk.gpx",
+        audio=tmp_path / "audio" / "walk_audio.mp3",
         route_cache=tmp_path / "cache" / "routes",
     )
-    for key in ("plan_path", "gpx_path", "audio_path"):
-        paths[key].parent.mkdir(parents=True, exist_ok=True)
-    if today and not paths["today_path"].exists():
-        _today_plan(paths["today_path"])
+    for path in (paths.plan, paths.gpx, paths.audio):
+        path.parent.mkdir(parents=True, exist_ok=True)
+    if today and not paths.today.exists():
+        _today_plan(paths.today)
     kwargs.setdefault("llm_fn", lambda _prompt: {})
     kwargs.setdefault("load_weather_fn", lambda: None)
     kwargs.setdefault("synth", FAKE_SYNTH)
     kwargs.setdefault("base_plan", UserPlan(preferred_time="16:30", duration_minutes=30))
-    return run(
-        settings=_settings(tmp_path, pbf),
-        **paths,
-        **kwargs,
-    )
+    return run(settings=_settings(tmp_path, pbf), paths=paths, **kwargs)
 
 
 def test_run_without_approval_stops_before_route_voice(tmp_path):
@@ -163,3 +159,37 @@ def test_e2e_full_pipeline_writes_every_output(tmp_path):
     plan = read_json(tmp_path / "plans" / "plan.json")
     proposal = read_json(tmp_path / "proposal.json")
     assert plan["for_date"] == proposal["for_date"] == date.today().isoformat()
+
+
+def test_airplane_mode_full_chain_completes(tmp_path, monkeypatch):
+    """Trailhead proof: no internet (weather fetch fails) and no Ollama
+    (dead host) -> run() still builds proposal, plan, route and voice."""
+    import requests
+
+    from walkie import weather as weather_mod
+
+    def blocked(*args, **kwargs):
+        raise requests.ConnectionError("airplane mode")
+
+    monkeypatch.setattr(requests, "get", blocked)
+    monkeypatch.setattr(
+        config, "load_ollama_config", lambda: ("http://127.0.0.1:1", "airplane-test")
+    )
+    pbf = write_grid_pbf(tmp_path / "grid.osm.pbf")
+    settings = _settings(tmp_path, pbf)  # empty weather cache, local cache dir
+    actions = _run(
+        tmp_path,
+        pbf,
+        today=True,
+        llm_fn=None,  # exercise the real call_llm -> dead host -> fallback
+        load_weather_fn=lambda: weather_mod.refresh_from_settings(settings),
+    )
+    assert any(a.startswith("proposal ") for a in actions)
+    assert any(a.startswith("plan ") for a in actions)
+    assert "route: rebuilt" in actions
+    assert "voice: rebuilt" in actions
+    proposal = read_json(tmp_path / "proposal.json")
+    assert "base plan" in proposal["reason"]  # LLM fallback, no crash
+    assert "unavailable" in proposal["weather_summary"]  # offline weather line
+    plan = read_json(tmp_path / "plans" / "plan.json")
+    assert plan["for_date"] == date.today().isoformat()

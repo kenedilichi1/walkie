@@ -47,7 +47,10 @@ line-length = 100
 src = ["src", "tests"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "W"]
+select = ["E", "F", "I", "UP", "B", "W", "PLR0913"]
+
+[tool.ruff.lint.pylint]
+max-args = 13
 
 [tool.mypy]
 python_version = "3.10"

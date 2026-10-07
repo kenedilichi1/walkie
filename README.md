@@ -33,6 +33,7 @@ walkie/
 ├── tests/           # unit/ (pytest, incl. offscreen Qt smoke tests)
 ├── output/          # generated at runtime (gitignored)
 ├── docs/            # build_logic.md, test_protocol.md
+├── TEST_LOG.md      # field-testing log (fill during walks, Step 9)
 └── scripts/         # setup_env.sh
 ```
 

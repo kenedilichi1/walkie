@@ -13,6 +13,6 @@ Per-step tests are run before moving to the next step.
 | 7 | `walkie remind` while a proposal is due (or `walkie daemon`), then `walkie serve` | notification fires carrying a random quote from `config/quotes.txt` + the proposal detail; server prints `http://<laptop-ip>:8000/` and the 3 file URLs; missing files flagged `[missing]` |
 | 8 | open the printed laptop URL on the phone (same Wi-Fi) | landing page lists today_plan.json + walk.gpx + walk_audio.mp3 with sizes; all download; GPX imports into OsmAnd and renders offline |
 | 9 | `walkie run`, run it twice, then `walkie run --force` | end-to-end: proposal + plan written; once approved also walk.gpx (closes, spans the window) + walk_audio.mp3; second run reports route/voice up-to-date (no rebuild); `--force` rebuilds; before approval: quote notification fires when due, route/voice deferred; missing pbf when approved -> exit 1 with "make region" |
-| 10 | field walk | see TEST_LOG.md |
+| 10 | field walk (airplane-mode check at the trailhead) | see `TEST_LOG.md`: section B green offline, ≥1 walk logged with screen time (< 2 min target), refinements to `user_plan.json`/`quotes.txt` recorded |
 
 Unit tests: `make test` · Lint: `make lint` · Types: `make typecheck`
