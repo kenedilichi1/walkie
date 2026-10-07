@@ -1,15 +1,19 @@
 """Open-Meteo forecast fetch with a local, staleness-aware cache.
 
-Writes/reads cache/weather_today.json (path from config/settings.yaml).
 Offline-first: when a fetch fails but a cache exists, the stale cache wins.
+Also home of the weather summary/fingerprint used in prompts and validity.
 """
+
 from __future__ import annotations
 
-import json
 import time
 from pathlib import Path
 
 import requests
+
+from walkie.config import Settings
+from walkie.models import Weather
+from walkie.storage import read_json, write_json
 
 WMO_SUMMARY = {
     0: "clear sky",
@@ -52,8 +56,8 @@ def fetch_forecast(
     lon: float,
     timezone_name: str,
     url: str = "https://api.open-meteo.com/v1/forecast",
-) -> dict | None:
-    """Fetch today's forecast; returns a compact dict, or None on failure."""
+) -> Weather | None:
+    """Fetch today's forecast; returns compact Weather, or None on failure."""
     try:
         response = requests.get(
             url,
@@ -76,46 +80,43 @@ def fetch_forecast(
         return None
 
 
-def compact_forecast(raw: dict, timezone_name: str) -> dict:
+def compact_forecast(raw: dict, timezone_name: str) -> Weather:
     """Reduce an Open-Meteo response to the fields walkie cares about."""
     current = raw.get("current", {})
     hourly = raw.get("hourly", {})
     temps = hourly.get("temperature_2m") or [current.get("temperature_2m", 0.0)]
     rain_probs = hourly.get("precipitation_probability") or [0]
     weather_code = int(current.get("weather_code", -1))
-    return {
-        "fetched_at": int(time.time()),
-        "timezone": timezone_name,
-        "summary": describe_weather_code(weather_code),
-        "weather_code": weather_code,
-        "temperature_2m": current.get("temperature_2m"),
-        "temperature_2m_min": min(t for t in temps if t is not None),
-        "temperature_2m_max": max(t for t in temps if t is not None),
-        "precipitation_mm": current.get("precipitation", 0.0),
-        "precipitation_probability_max": max(
+    return Weather(
+        fetched_at=int(time.time()),
+        timezone=timezone_name,
+        summary=describe_weather_code(weather_code),
+        weather_code=weather_code,
+        temperature_2m=current.get("temperature_2m"),
+        temperature_2m_min=min(t for t in temps if t is not None),
+        temperature_2m_max=max(t for t in temps if t is not None),
+        precipitation_mm=current.get("precipitation", 0.0),
+        precipitation_probability_max=max(
             (p for p in rain_probs if p is not None), default=0
         ),
-        "wind_speed_10m": current.get("wind_speed_10m"),
-        "cloud_cover": current.get("cloud_cover"),
-    }
+        wind_speed_10m=current.get("wind_speed_10m"),
+        cloud_cover=current.get("cloud_cover"),
+    )
 
 
-def load_cache(cache_path: Path) -> dict | None:
-    try:
-        return json.loads(Path(cache_path).read_text())
-    except (OSError, ValueError):
-        return None
+def load_cache(cache_path: Path) -> Weather | None:
+    data = read_json(cache_path)
+    return Weather.from_dict(data) if data is not None else None
 
 
-def is_stale(cache: dict, max_age_hours: float = 2.0) -> bool:
-    fetched_at = cache.get("fetched_at", 0)
-    return (time.time() - fetched_at) > max_age_hours * 3600
+def is_stale(cache: Weather | None, max_age_hours: float = 2.0) -> bool:
+    if cache is None:
+        return True
+    return (time.time() - cache.fetched_at) > max_age_hours * 3600
 
 
-def save_cache(cache_path: Path, data: dict) -> None:
-    path = Path(cache_path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2) + "\n")
+def save_cache(cache_path: Path, weather: Weather) -> None:
+    write_json(cache_path, weather.to_dict())
 
 
 def refresh_if_stale(
@@ -126,7 +127,7 @@ def refresh_if_stale(
     url: str = "https://api.open-meteo.com/v1/forecast",
     max_age_hours: float = 2.0,
     force: bool = False,
-) -> dict | None:
+) -> Weather | None:
     """Return fresh weather, refetching only when the cache is stale/missing."""
     cached = load_cache(cache_path)
     if cached is not None and not force and not is_stale(cached, max_age_hours):
@@ -136,3 +137,50 @@ def refresh_if_stale(
         return cached  # stale beats nothing (offline-first)
     save_cache(cache_path, fresh)
     return fresh
+
+
+def refresh_from_settings(
+    settings: Settings,
+    max_age_hours: float = 2.0,
+    force: bool = False,
+) -> Weather | None:
+    """refresh_if_stale wired from validated settings."""
+    return refresh_if_stale(
+        settings.weather_cache,
+        settings.lat,
+        settings.lon,
+        settings.timezone,
+        url=settings.forecast_url,
+        max_age_hours=max_age_hours,
+        force=force,
+    )
+
+
+def weather_fingerprint(weather: Weather | None) -> str:
+    """Bucketed fingerprint: stable across jitter, flips when conditions change."""
+    if weather is None:
+        return "unavailable"
+    temp = weather.temperature_2m or 0.0
+    rain = weather.precipitation_probability_max or 0
+    rain_bucket = next(
+        (
+            label
+            for limit, label in ((10, "low"), (30, "mild"), (60, "med"))
+            if rain <= limit
+        ),
+        "high",
+    )
+    return f"{weather.summary}|{round(temp / 5) * 5:.0f}C|{rain_bucket}"
+
+
+def weather_line(weather: Weather | None) -> str:
+    if weather is None:
+        return "weather unavailable (offline)"
+    temp = weather.temperature_2m
+    high = weather.temperature_2m_max or temp
+    return (
+        f"{weather.summary or 'unknown'}, {temp}C "
+        f"(high {high}C), "
+        f"rain chance {weather.precipitation_probability_max}%, "
+        f"wind {weather.wind_speed_10m or '?'} km/h"
+    )

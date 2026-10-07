@@ -166,6 +166,13 @@ class Proposal:
         data["intensity"] = self.intensity.value
         return data
 
+    def approve(self, approved_at: str, approved_by: str) -> TodayPlan:
+        return TodayPlan(
+            **{f.name: getattr(self, f.name) for f in fields(self)},
+            approved_at=approved_at,
+            approved_by=approved_by,
+        )
+
 
 @dataclass(frozen=True)
 class TodayPlan(Proposal):
