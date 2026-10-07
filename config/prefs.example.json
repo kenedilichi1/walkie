@@ -1,0 +1,12 @@
+{
+  "prefer_shade": true,
+  "avoid_busy_roads": true,
+  "min_walk_minutes": 30,
+  "max_walk_minutes": 60,
+  "buffer_minutes": 5,
+  "walking_pace_kmh": 5.0,
+  "bpm_min": 100,
+  "bpm_max": 120,
+  "avoid_hours": [14],
+  "notes": "Edit me: e.g. prefer shade, no 2 PM walks"
+}

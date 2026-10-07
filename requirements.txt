@@ -1,0 +1,11 @@
+ollama
+icalendar
+requests
+astral
+osmnx
+networkx
+gpxpy
+mutagen
+librosa
+plyer
+pyyaml

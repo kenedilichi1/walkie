@@ -1,0 +1,29 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+
+# generated at runtime
+output/
+cache/
+
+# large local inputs / model weights
+data/music/
+data/osm/
+data/calendar/
+.ollama/
+
+# local secrets / machine-specific
+config/*
+!config/*.example.*
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store

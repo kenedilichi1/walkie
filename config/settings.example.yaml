@@ -1,0 +1,24 @@
+region:
+  name: "your-region"
+  pbf: "data/osm/region.pbf"
+
+location:
+  lat: 0.0
+  lon: 0.0
+  timezone: "UTC"
+  start_place: "home"   # home | office | park | coffee
+
+calendar:
+  ics_path: "data/calendar/work.ics"
+
+weather:
+  cache: "cache/weather_today.json"
+  forecast_url: "https://api.open-meteo.com/v1/forecast"
+
+ollama:
+  host: "http://localhost:11434"
+  model: "llama3.2:3b"
+
+paths:
+  output: "output"
+  music: "data/music"
