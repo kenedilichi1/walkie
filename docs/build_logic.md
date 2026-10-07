@@ -19,11 +19,14 @@ Pipeline order (each stage reads only config/, data/, and prior stage output/):
 6. `walkie voice` — read `output/routes/walk.gpx`, narrate the turns with
    local Piper TTS -> `output/audio/walk_audio.mp3` (spoken cues only — no
    playlist matching; play your own music alongside it)
-7. Sync — OS notification + local file drop to phone
+7. Reminders + phone sync — each reminder notification carries a random
+   quote from `config/quotes.txt`; `walkie serve` puts `output/` on the LAN
+   (landing page at `/` lists today_plan.json + walk.gpx + walk_audio.mp3)
+   so the phone downloads the files and imports the GPX into OsmAnd
 
-Entry points: `make wizard|region|suggest|plan|route|voice|remind|daemon` —
-all of them run `python -m walkie <cmd>` (or the `walkie` console script after
-`pip install -e .`).
+Entry points: `make wizard|region|suggest|plan|route|voice|remind|daemon|serve`
+— all of them run `python -m walkie <cmd>` (or the `walkie` console script
+after `pip install -e .`).
 
 Code layout (`src/walkie/`):
 
@@ -38,6 +41,7 @@ Code layout (`src/walkie/`):
 - `ai/` — planning system prompt + decision engine (plan.json)
 - `routing/` — OSM extract -> OSMnx street graph -> closed loop -> walk.gpx
 - `media/` — GPX turn narration (Piper TTS, voice-only MP3)
+- `sync/` — desktop notification bridge (plyer + quote) and the LAN server
 - `suggest/` — prompts, proposals, reminders
 - `ui/` — setup wizard, quick-adjust dialog, shared widgets
 - `region.py` — Geofabrik extract detection + download

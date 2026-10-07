@@ -49,6 +49,14 @@ def test_parser_route_flags():
     assert args.refresh is False
 
 
+def test_parser_serve_port():
+    args = cli.build_parser().parse_args(["serve"])
+    assert args.command == "serve"
+    assert args.port == 8000
+    args = cli.build_parser().parse_args(["serve", "--port", "9999"])
+    assert args.port == 9999
+
+
 def test_main_exit_codes(monkeypatch):
     from walkie import config, region
 

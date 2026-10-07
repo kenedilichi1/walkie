@@ -14,6 +14,7 @@ from walkie.log import get_logger
 from walkie.models import Proposal, TodayPlan, UserPlan, Weather
 from walkie.storage import read_json, write_json
 from walkie.suggest.proposals import ensure_proposal
+from walkie.sync.notify import send_notification, with_quote
 from walkie.weather import refresh_from_settings
 
 log = get_logger("suggest")
@@ -21,16 +22,6 @@ log = get_logger("suggest")
 REMINDER_OFFSETS_MIN = (30, 15, 5)
 
 NotifyFn = Callable[[str, str], None]
-
-
-def send_notification(title: str, message: str) -> None:
-    """Best-effort OS notification (logs when no desktop backend)."""
-    try:
-        from plyer import notification
-
-        notification.notify(title=title, message=message, app_name="walkie", timeout=10)
-    except Exception as exc:  # noqa: BLE001 - headless/log fallback
-        log.info(f"notification unavailable ({exc}): {title} — {message}")
 
 
 def reminder_message(proposal: Proposal) -> str:
@@ -72,7 +63,7 @@ def check_reminders(
             continue
         notify_fn(
             f"walkie: walk at {proposal.suggested_time}",
-            reminder_message(proposal),
+            with_quote(reminder_message(proposal)),
         )
         fired.append(offset)
         actions.append(f"reminder-{offset}")
