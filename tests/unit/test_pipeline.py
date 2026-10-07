@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import os
-from datetime import date, datetime
+from datetime import date, datetime, time
 from pathlib import Path
 
 import gpxpy
 import pytest
-from test_routing import LAT0, LON0, write_grid_pbf
+from grid_fixture import LAT0, LON0, write_grid_pbf
 
 from walkie import config
 from walkie.media.voice import AudioSpec
@@ -67,7 +67,9 @@ def _run(tmp_path: Path, pbf: Path | None, *, today: bool, **kwargs):
 
 def test_run_without_approval_stops_before_route_voice(tmp_path):
     pbf = write_grid_pbf(tmp_path / "grid.osm.pbf")
-    actions = _run(tmp_path, pbf, today=False)
+    # before the 16:30 walk: reminders must not auto-approve yet
+    morning = datetime.combine(date.today(), time(9, 0))
+    actions = _run(tmp_path, pbf, today=False, now=morning)
     assert any(a.startswith("proposal ") for a in actions)
     assert any(a.startswith("plan ") for a in actions)
     assert "route/voice: waiting for approval" in actions

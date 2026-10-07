@@ -55,8 +55,11 @@ def test_check_reminders_fires_at_30_15_5_then_auto_approves(tmp_path):
     write_json(proposal_path, _proposal("16:30"))
     notified = []
     notify = lambda title, message: notified.append((title, message))  # noqa: E731
-    paths = dict(proposal_path=proposal_path, today_path=today_path,
-                 state_path=state_path)
+    paths = {
+        "proposal_path": proposal_path,
+        "today_path": today_path,
+        "state_path": state_path,
+    }
 
     day = "2026-10-07"
     at_1600 = datetime.fromisoformat(f"{day}T16:00")
@@ -180,3 +183,21 @@ def test_ensure_proposal_regenerates_on_new_day(tmp_path):
                               now=datetime.fromisoformat("2026-10-08T09:00"),
                               proposal_path=proposal_path, llm_fn=llm_fn)
     assert len(calls) == 2
+
+
+def test_ensure_proposal_ignores_unusable_llm_reply(tmp_path):
+    """The reply validator runs on the production path, not only in tests."""
+    proposal_path = tmp_path / "proposal.json"
+    plan = UserPlan(preferred_time="16:30", duration_minutes=30)
+    reply = {"suggested_time": "25:00", "duration_minutes": 45, "reason": "bad"}
+
+    proposal = proposals.ensure_proposal(
+        plan,
+        None,
+        now=datetime.fromisoformat("2026-10-07T09:00"),
+        proposal_path=proposal_path,
+        llm_fn=lambda prompt: reply,
+    )
+    assert proposal.suggested_time == "16:30"  # fell back, no crash
+    assert proposal.duration_minutes == 30
+    assert "base plan" in proposal.reason

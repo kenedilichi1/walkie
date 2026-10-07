@@ -7,12 +7,11 @@ config/user_plan.json and shows a motivational quote.
 
 from __future__ import annotations
 
-import sys
+from collections.abc import Sequence
 from dataclasses import replace
 from pathlib import Path
 
 from PyQt6.QtWidgets import (
-    QApplication,
     QComboBox,
     QFormLayout,
     QLabel,
@@ -28,6 +27,7 @@ from walkie.llm import complete
 from walkie.log import get_logger
 from walkie.models import Intensity, LocationType, UserPlan
 from walkie.suggest.prompts import build_confirmation_prompt, describe_plan
+from walkie.ui.app import ensure_app
 from walkie.ui.widgets import make_duration_spin, make_time_edit
 
 log = get_logger("wizard")
@@ -44,7 +44,7 @@ INTENSITY_CHOICES: list[tuple[Intensity, str]] = [
 ]
 
 
-def _choice_index(choices: list[tuple[object, str]], value: object) -> int:
+def _choice_index(choices: Sequence[tuple[object, str]], value: object) -> int:
     for index, (member, _label) in enumerate(choices):
         if member == value:
             return index
@@ -154,7 +154,7 @@ def confirm_with_user(plan: UserPlan) -> UserPlan | None:
 
 
 def run_setup() -> None:
-    app = QApplication.instance() or QApplication(sys.argv)
+    app = ensure_app()
     app.setApplicationName("walkie-setup")
 
     wizard = PlanWizard()

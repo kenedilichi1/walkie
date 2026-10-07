@@ -11,11 +11,13 @@ import math
 import secrets
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import yaml
 
+from walkie import clock, policy
 from walkie.models import UserPlan
-from walkie.storage import read_json, write_json
+from walkie.storage import read_record, write_json
 
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG_DIR = ROOT / "config"
@@ -59,11 +61,11 @@ class Settings:
     pbf: Path | None
 
 
-def _read_yaml(path: Path) -> dict:
+def _read_yaml(path: Path) -> dict[str, Any]:
     if not path.exists():
         raise ConfigError(f"{path} missing — run: make setup")
     try:
-        data = yaml.safe_load(path.read_text()) or {}
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     except (OSError, yaml.YAMLError) as exc:
         raise ConfigError(f"could not read {path}: {exc}") from exc
     if not isinstance(data, dict):
@@ -132,7 +134,7 @@ def load_quotes(path: Path = QUOTES_PATH) -> list[str]:
         return [DEFAULT_QUOTE]
     quotes = [
         line.strip()
-        for line in path.read_text().splitlines()
+        for line in path.read_text(encoding="utf-8").splitlines()
         if line.strip() and not line.startswith("#")
     ]
     return quotes or [DEFAULT_QUOTE]
@@ -143,10 +145,26 @@ def pick_quote(path: Path = QUOTES_PATH) -> str:
 
 
 def load_user_plan(path: Path = USER_PLAN_PATH) -> UserPlan:
-    data = read_json(path)
-    if data is None:
-        raise ConfigError(f"{path} missing — run: walkie wizard")
-    return UserPlan.from_dict(data)
+    """Load the user's preferences; fail loudly on anything unusable.
+
+    This is the boundary for hand-edited data, so unlike the cached records
+    (tolerant by design) a bad time or duration is an error with a remedy.
+    """
+    plan = read_record(path, UserPlan.from_dict)
+    if plan is None:
+        raise ConfigError(f"{path} missing or unreadable — run: walkie wizard")
+    if clock.parse_hhmm(plan.preferred_time) is None:
+        raise ConfigError(
+            f"{path}: preferred_time {plan.preferred_time!r} is not HH:MM — "
+            "run: walkie wizard"
+        )
+    if not policy.MIN_DURATION <= plan.duration_minutes <= policy.MAX_DURATION:
+        raise ConfigError(
+            f"{path}: duration_minutes {plan.duration_minutes} outside "
+            f"{policy.MIN_DURATION}-{policy.MAX_DURATION} min — "
+            "run: walkie wizard"
+        )
+    return plan
 
 
 def save_user_plan(plan: UserPlan, path: Path = USER_PLAN_PATH) -> None:

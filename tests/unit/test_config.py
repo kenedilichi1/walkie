@@ -99,6 +99,27 @@ def test_load_user_plan_missing(tmp_path):
         config.load_user_plan(tmp_path / "user_plan.json")
 
 
+def test_load_user_plan_distinguishes_corrupt_from_missing(tmp_path):
+    path = tmp_path / "user_plan.json"
+    path.write_text("{truncated")
+    with pytest.raises(ConfigError, match="missing or unreadable"):
+        config.load_user_plan(path)
+
+
+def test_load_user_plan_rejects_unusable_time(tmp_path):
+    path = tmp_path / "user_plan.json"
+    path.write_text('{"preferred_time": "banana"}')
+    with pytest.raises(ConfigError, match="not HH:MM"):
+        config.load_user_plan(path)
+
+
+def test_load_user_plan_rejects_out_of_range_duration(tmp_path):
+    path = tmp_path / "user_plan.json"
+    path.write_text('{"preferred_time": "16:30", "duration_minutes": 500}')
+    with pytest.raises(ConfigError, match="duration_minutes"):
+        config.load_user_plan(path)
+
+
 def test_voice_model_defaults_when_section_missing(tmp_path):
     settings = config.load_settings(write_settings(tmp_path, VALID_YAML))
     assert settings.voice_model.is_absolute()

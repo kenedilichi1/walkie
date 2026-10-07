@@ -3,6 +3,13 @@
 from __future__ import annotations
 
 from walkie.models import UserPlan, Weather
+from walkie.policy import (
+    MAX_DURATION,
+    MAX_HOUR,
+    MAX_SHIFT_MINUTES,
+    MIN_DURATION,
+    MIN_HOUR,
+)
 from walkie.weather import weather_line
 
 
@@ -33,9 +40,10 @@ def build_prompt(plan: UserPlan, weather: Weather | None) -> str:
         f"{plan.location_type.value} preferred, "
         f"{plan.intensity.value} intensity{area}. "
         f"Today's weather: {weather_line(weather)}. "
-        "Rules: rain chance over 30% -> keep shade; shift start by at most "
-        "60 min to dodge bad weather; time must stay within 06:00-21:00; "
-        "duration 5-120 min. "
+        "Rules: rain chance over 30% -> keep shade; "
+        f"shift start by at most {MAX_SHIFT_MINUTES} min to dodge bad weather; "
+        f"time must stay within {MIN_HOUR:02d}:00-{MAX_HOUR:02d}:00; "
+        f"duration {MIN_DURATION}-{MAX_DURATION} min. "
         'Reply with ONLY a JSON object: {"suggested_time":"HH:MM",'
         '"duration_minutes":N,"reason":"one sentence why",'
         '"route_notes":"one short routing tip"}. No other text.'

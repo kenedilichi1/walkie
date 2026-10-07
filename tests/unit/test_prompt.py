@@ -1,5 +1,6 @@
 from walkie.ai.prompt import SYSTEM_PROMPT, build_user_prompt
 from walkie.models import Daylight, Proposal, UserPlan, Weather
+from walkie.policy import MAX_DURATION, MAX_HOUR, MIN_DURATION, MIN_HOUR
 
 
 def test_system_prompt_demands_strict_json_with_schema():
@@ -13,8 +14,8 @@ def test_system_prompt_demands_strict_json_with_schema():
         "route_notes",
     ):
         assert key in SYSTEM_PROMPT
-    assert "06:00-21:00" in SYSTEM_PROMPT
-    assert "5-120" in SYSTEM_PROMPT
+    assert f"{MIN_HOUR:02d}:00-{MAX_HOUR:02d}:00" in SYSTEM_PROMPT
+    assert f"{MIN_DURATION}-{MAX_DURATION}" in SYSTEM_PROMPT
 
 
 def test_user_prompt_includes_structured_inputs():
