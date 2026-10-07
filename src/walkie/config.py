@@ -28,6 +28,7 @@ QUOTES_PATH = CONFIG_DIR / "quotes.txt"
 PROPOSAL_PATH = OUTPUT_DIR / "proposal.json"
 TODAY_PLAN_PATH = OUTPUT_DIR / "today_plan.json"
 REMINDER_STATE_PATH = OUTPUT_DIR / "reminder_state.json"
+PLAN_PATH = OUTPUT_DIR / "plans" / "plan.json"
 
 DEFAULT_OLLAMA_HOST = "http://localhost:11434"
 DEFAULT_OLLAMA_MODEL = "llama3.2:3b"

@@ -8,13 +8,17 @@ Pipeline order (each stage reads only config/, data/, and prior stage output/):
    proposal -> `output/proposal.json`; quick edit via `walkie suggest --edit`,
    reminders at T-30/T-15/T-5 (`walkie remind` once, `walkie daemon` to loop)
    -> `output/today_plan.json` (auto-approves at walk time if nobody edits)
-4. AI decision engine — Ollama scores prefs + conditions -> `output/plans/plan.json`
+4. `walkie plan` — AI decision engine: structured inputs (today's proposal,
+   weather, daylight) -> one local LLM call -> validated
+   `output/plans/plan.json` (falls back to the inputs when the model is
+   unreachable or replies garbage)
 5. Route builder + GPX export -> `output/routes/walk.gpx`
 6. Playlist matcher + voice cues -> `output/audio/playlist.json`, `walk_final.mp3`
 7. Sync — OS notification + local file drop to phone
 
-Entry points: `make wizard|region|suggest|remind|daemon` — all of them run
-`python -m walkie <cmd>` (or the `walkie` console script after `pip install -e .`).
+Entry points: `make wizard|region|suggest|plan|remind|daemon` — all of them
+run `python -m walkie <cmd>` (or the `walkie` console script after
+`pip install -e .`).
 
 Code layout (`src/walkie/`):
 
@@ -23,8 +27,10 @@ Code layout (`src/walkie/`):
 - `models.py` — `UserPlan` / `Weather` / `Proposal` / `TodayPlan` dataclasses
 - `storage.py` — atomic JSON read/write
 - `log.py`, `clock.py` — stderr logging, local wall-clock
-- `llm.py` — the single Ollama client
+- `llm.py` — the single Ollama client (system + user messages)
 - `weather.py` — Open-Meteo fetch, staleness cache, prompt fingerprint
+- `daylight.py` — sunrise/sunset/day length (astral, offline)
+- `ai/` — planning system prompt + decision engine (plan.json)
 - `suggest/` — prompts, proposals, reminders
 - `ui/` — setup wizard, quick-adjust dialog, shared widgets
 - `region.py` — Geofabrik extract detection + download
