@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
-from typing import Callable
 
 from walkie import clock, config
 from walkie.llm import complete_json, extract_json

@@ -59,10 +59,10 @@ def cmd_region(args: argparse.Namespace) -> int:
 
 
 def cmd_suggest(args: argparse.Namespace) -> int:
+    from walkie.models import TodayPlan
     from walkie.storage import read_json
     from walkie.suggest.proposals import ensure_proposal
     from walkie.suggest.reminders import load_weather
-    from walkie.models import TodayPlan
 
     base_plan = config.load_user_plan()
     weather = load_weather()

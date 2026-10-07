@@ -88,9 +88,15 @@ def geofabrik_continents() -> list[str]:
 def reverse_region(lat: float, lon: float) -> str | None:
     """Best-effort sub-region (state/province) for more specific extracts."""
     try:
+        params: dict[str, str | float] = {
+            "format": "jsonv2",
+            "lat": lat,
+            "lon": lon,
+            "zoom": 5,
+        }
         r = requests.get(
             "https://nominatim.openstreetmap.org/reverse",
-            params={"format": "jsonv2", "lat": lat, "lon": lon, "zoom": 5},
+            params=params,
             headers=UA,
             timeout=10,
         )

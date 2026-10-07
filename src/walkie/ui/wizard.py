@@ -18,9 +18,9 @@ from PyQt6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMessageBox,
+    QVBoxLayout,
     QWizard,
     QWizardPage,
-    QVBoxLayout,
 )
 
 from walkie import clock, config

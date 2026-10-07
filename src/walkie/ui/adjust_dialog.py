@@ -25,7 +25,8 @@ def open_adjust_dialog(
     today_path: Path = config.TODAY_PLAN_PATH,
 ) -> bool:
     """Quick edit window (time/duration); returns False if cancelled."""
-    app = QApplication.instance() or QApplication(sys.argv)
+    if QApplication.instance() is None:
+        QApplication(sys.argv)
     dialog = QDialog()
     dialog.setWindowTitle("Adjust today's walk")
     current: Proposal = existing or proposal

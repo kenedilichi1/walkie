@@ -1,6 +1,6 @@
 PYTHON := $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 
-.PHONY: setup region wizard suggest remind daemon test lint clean
+.PHONY: setup region wizard suggest remind daemon test lint typecheck clean
 
 setup:
 	bash scripts/setup_env.sh
@@ -25,6 +25,9 @@ test:
 
 lint:
 	$(PYTHON) -m ruff check src tests
+
+typecheck:
+	$(PYTHON) -m mypy src/walkie
 
 clean:
 	rm -rf output/* .pytest_cache

@@ -59,19 +59,20 @@ def fetch_forecast(
 ) -> Weather | None:
     """Fetch today's forecast; returns compact Weather, or None on failure."""
     try:
+        params: dict[str, str | float] = {
+            "latitude": lat,
+            "longitude": lon,
+            "current": (
+                "temperature_2m,precipitation,weather_code,"
+                "wind_speed_10m,cloud_cover"
+            ),
+            "hourly": "temperature_2m,precipitation_probability",
+            "timezone": timezone_name,
+            "forecast_days": 1,
+        }
         response = requests.get(
             url,
-            params={
-                "latitude": lat,
-                "longitude": lon,
-                "current": (
-                    "temperature_2m,precipitation,weather_code,"
-                    "wind_speed_10m,cloud_cover"
-                ),
-                "hourly": "temperature_2m,precipitation_probability",
-                "timezone": timezone_name,
-                "forecast_days": 1,
-            },
+            params=params,
             timeout=15,
         )
         response.raise_for_status()

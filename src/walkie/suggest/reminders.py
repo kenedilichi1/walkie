@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from dataclasses import replace
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Callable
 
 from walkie import clock, config
 from walkie.log import get_logger
