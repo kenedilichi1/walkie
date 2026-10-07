@@ -11,7 +11,9 @@ from __future__ import annotations
 import argparse
 import re
 import sys
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import requests
 
@@ -33,6 +35,9 @@ CONTINENT_FALLBACK = [
     "oceania",
 ]
 
+# one source: (url, payload parser) — parser returns the same five fields
+LocSource = tuple[str, Callable[[dict[str, Any]], tuple[Any, Any, Any, str, str]]]
+
 
 class RegionError(Exception):
     """Setup problem; the message is user-facing."""
@@ -44,7 +49,7 @@ def slugify(name: str) -> str:
 
 def detect_location() -> tuple[float, float, str, str, str]:
     """Return (lat, lon, country_name, country_code, timezone) from IP."""
-    sources = (
+    sources: tuple[LocSource, ...] = (
         ("https://ipapi.co/json/", lambda d: (
             d["latitude"], d["longitude"], d["country_name"],
             d.get("country_code", ""), d.get("timezone", "UTC"))),
@@ -106,9 +111,10 @@ def reverse_region(lat: float, lon: float) -> str | None:
             addr.get("state") or addr.get("region")
             or addr.get("province") or addr.get("state_district")
         )
-        if region:
+        if isinstance(region, str) and region:
             log.info(f"Reverse geocode sub-region: {region}")
-        return region
+            return region
+        return None
     except Exception as exc:  # noqa: BLE001
         log.info(f"  reverse geocode failed: {exc}")
         return None
@@ -182,21 +188,25 @@ def find_extract(
 
 
 def download(url: str, dest: Path) -> None:
+    """Fetch `url` into `dest`; network failures surface as RegionError."""
     log.info(f"Downloading {url} -> {dest}")
-    r = requests.get(url, headers=UA, stream=True, timeout=60)
-    r.raise_for_status()
-    total = int(r.headers.get("Content-Length") or 0)
-    if total > 700 * 1024 * 1024:
-        log.info(f"  warning: {total / 1e6:.0f} MB is large; consider a "
-                 "sub-region if your country is split on Geofabrik")
-    done = 0
-    with open(dest, "wb") as fh:
-        for chunk in r.iter_content(chunk_size=1 << 20):
-            fh.write(chunk)
-            done += len(chunk)
-            if total:
-                print(f"\r  {done / 1e6:.0f} / {total / 1e6:.0f} MB",
-                      end="", file=sys.stderr)
+    try:
+        r = requests.get(url, headers=UA, stream=True, timeout=60)
+        r.raise_for_status()
+        total = int(r.headers.get("Content-Length") or 0)
+        if total > 700 * 1024 * 1024:
+            log.info(f"  warning: {total / 1e6:.0f} MB is large; consider a "
+                     "sub-region if your country is split on Geofabrik")
+        done = 0
+        with open(dest, "wb") as fh:
+            for chunk in r.iter_content(chunk_size=1 << 20):
+                fh.write(chunk)
+                done += len(chunk)
+                if total:
+                    print(f"\r  {done / 1e6:.0f} / {total / 1e6:.0f} MB",
+                          end="", file=sys.stderr)
+    except requests.RequestException as exc:
+        raise RegionError(f"download of {url} failed: {exc}") from exc
     log.info(f"\nDownloaded {done / 1e6:.0f} MB")
 
 

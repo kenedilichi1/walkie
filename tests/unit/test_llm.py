@@ -17,7 +17,7 @@ def test_complete_sends_system_then_user_message(monkeypatch):
     captured = {}
 
     class FakeClient:
-        def __init__(self, host=None):
+        def __init__(self, host=None, **kwargs):
             pass
 
         def chat(self, model, messages, options):
@@ -37,7 +37,7 @@ def test_complete_without_system_sends_only_user_message(monkeypatch):
     captured = {}
 
     class FakeClient:
-        def __init__(self, host=None):
+        def __init__(self, host=None, **kwargs):
             pass
 
         def chat(self, model, messages, options):

@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from datetime import time as dtime
 from pathlib import Path
+from typing import Any, cast
 from zoneinfo import ZoneInfo
 
 import geopandas as gpd
@@ -30,7 +31,7 @@ from walkie.geo import haversine_m
 from walkie.log import get_logger
 from walkie.models import Plan, TodayPlan, UserPlan
 from walkie.routing import RouteError
-from walkie.storage import read_json
+from walkie.storage import read_record
 
 log = get_logger("route")
 
@@ -93,7 +94,7 @@ def _cache_paths(cache_dir: Path) -> tuple[Path, Path]:
     return cache_dir / "streets.graphml", cache_dir / "streets.meta.json"
 
 
-def _expected_meta(pbf_path: Path, lat: float, lon: float) -> dict:
+def _expected_meta(pbf_path: Path, lat: float, lon: float) -> dict[str, Any]:
     stat = pbf_path.stat()
     return {
         "pbf": str(pbf_path),
@@ -105,9 +106,9 @@ def _expected_meta(pbf_path: Path, lat: float, lon: float) -> dict:
     }
 
 
-def _cache_matches(meta_path: Path, expected: dict) -> bool:
+def _cache_matches(meta_path: Path, expected: dict[str, Any]) -> bool:
     try:
-        return json.loads(meta_path.read_text()) == expected
+        return bool(json.loads(meta_path.read_text()) == expected)
     except (OSError, ValueError):
         return False
 
@@ -143,7 +144,7 @@ def load_street_graph(
 
 
 def _graph_from_scanner(scanner: _Scanner) -> nx.MultiDiGraph:
-    rows: list[dict] = []
+    rows: list[dict[str, Any]] = []
     index: list[tuple[int, int, int]] = []
     used: set[int] = set()
     keys: dict[tuple[int, int], int] = {}
@@ -176,7 +177,7 @@ def _graph_from_scanner(scanner: _Scanner) -> nx.MultiDiGraph:
     return ox.graph_from_gdfs(nodes, edges, graph_attrs={"crs": "EPSG:4326"})
 
 
-def _reconstruct(pred: dict, node: int, source: int) -> list[int]:
+def _reconstruct(pred: dict[int, Any], node: int, source: int) -> list[int]:
     path: list[int] = [node]
     while path[-1] != source:
         path.append(pred[path[-1]][0])
@@ -204,7 +205,9 @@ def _disjoint_return(
             blocked.update((a, b, key) for key in existing)
     reduced.remove_edges_from(blocked)
     try:
-        return nx.shortest_path(reduced, source, dest, weight="length")
+        return cast(
+            "list[int]", nx.shortest_path(reduced, source, dest, weight="length")
+        )
     except nx.NetworkXNoPath:
         return None
 
@@ -242,7 +245,7 @@ def build_loop(
 
 
 def _fallback_out_and_back(
-    pred: dict, dist: dict, source: int, target_m: float
+    pred: dict[int, Any], dist: dict[int, float], source: int, target_m: float
 ) -> tuple[list[int], float]:
     reachable = [n for n, d in dist.items() if n != source and d > 0]
     if not reachable:
@@ -291,13 +294,32 @@ def export_gpx(
 
 
 def _start_time(hhmm: str, timezone_name: str) -> datetime | None:
-    try:
-        hour, minute = (int(part) for part in hhmm.split(":", 1))
-        return datetime.combine(
-            clock.now().date(), dtime(hour, minute), tzinfo=ZoneInfo(timezone_name)
-        )
-    except (ValueError, TypeError, KeyError):
+    """Today at `hhmm` in the region's tz; None (logged) when anything is off.
+
+    A bad time or an unknown timezone must not silently produce a wrong or
+    naive start — the caller falls back with this warning in the log.
+    """
+    parsed = clock.parse_hhmm(hhmm)
+    if parsed is None:
+        log.warning(f"unusable walk time {hhmm!r} (expected HH:MM)")
         return None
+    try:
+        tz = ZoneInfo(timezone_name)
+    except (KeyError, ValueError) as exc:
+        log.warning(f"unknown timezone {timezone_name!r} ({exc})")
+        return None
+    return datetime.combine(
+        clock.now().date(), dtime(parsed[0], parsed[1]), tzinfo=tz
+    )
+
+
+def _now_in(timezone_name: str) -> datetime:
+    """Current time in the region's tz; naive local only as a last resort."""
+    try:
+        return datetime.now(ZoneInfo(timezone_name))
+    except (KeyError, ValueError):
+        log.warning(f"unknown timezone {timezone_name!r}; using naive local time")
+        return clock.now()
 
 
 def resolve_walk_window(
@@ -307,23 +329,24 @@ def resolve_walk_window(
     user_plan_path: Path = config.USER_PLAN_PATH,
 ) -> tuple[int, datetime, str]:
     """(duration_minutes, start_time, source): today_plan -> plan -> user_plan."""
-    today = clock.now().date().isoformat()
-    today_data = read_json(today_plan_path)
-    if today_data:
-        proposal = TodayPlan.from_dict(today_data)
-        if proposal.for_date == today:
-            start = _start_time(proposal.suggested_time, timezone_name)
-            if start:
-                return proposal.duration_minutes, start, "today_plan"
-    plan_data = read_json(plan_path)
-    if plan_data:
-        plan = Plan.from_dict(plan_data)
-        if plan.for_date == today:
-            start = _start_time(plan.window_start, timezone_name)
-            if start:
-                return plan.duration_minutes, start, "plan"
-    base = UserPlan.from_dict(read_json(user_plan_path) or {})
-    start = _start_time(base.preferred_time, timezone_name) or clock.now()
+    today = clock.today_iso()
+    today_plan = read_record(today_plan_path, TodayPlan.from_dict)
+    if today_plan is not None and today_plan.for_date == today:
+        start = _start_time(today_plan.suggested_time, timezone_name)
+        if start is not None:
+            return today_plan.duration_minutes, start, "today_plan"
+    plan = read_record(plan_path, Plan.from_dict)
+    if plan is not None and plan.for_date == today:
+        start = _start_time(plan.window_start, timezone_name)
+        if start is not None:
+            return plan.duration_minutes, start, "plan"
+    base = read_record(user_plan_path, UserPlan.from_dict) or UserPlan()
+    start = _start_time(base.preferred_time, timezone_name)
+    if start is None:
+        log.warning(
+            f"no usable scheduled time; walking from now ({base.preferred_time!r})"
+        )
+        start = _now_in(timezone_name)
     return base.duration_minutes, start, "user_plan"
 
 

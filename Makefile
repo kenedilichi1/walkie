@@ -36,7 +36,7 @@ run:
 	$(PYTHON) -m walkie run
 
 test:
-	$(PYTHON) -m pytest -q
+	$(PYTHON) -m pytest -q --cov=walkie --cov-fail-under=84
 
 lint:
 	$(PYTHON) -m ruff check src tests

@@ -113,7 +113,7 @@ def cmd_region(args: argparse.Namespace) -> None:
 
 def cmd_suggest(args: argparse.Namespace) -> None:
     from walkie.models import TodayPlan
-    from walkie.storage import read_json
+    from walkie.storage import read_record
     from walkie.suggest.proposals import ensure_proposal
     from walkie.suggest.reminders import load_weather
 
@@ -124,8 +124,7 @@ def cmd_suggest(args: argparse.Namespace) -> None:
         from walkie.ui.adjust_dialog import open_adjust_dialog
 
         proposal = ensure_proposal(base_plan, weather)
-        existing_data = read_json(config.TODAY_PLAN_PATH)
-        existing = TodayPlan.from_dict(existing_data) if existing_data else None
+        existing = read_record(config.TODAY_PLAN_PATH, TodayPlan.from_dict)
         if open_adjust_dialog(proposal, existing):
             log.info("Edited plan saved to output/today_plan.json")
         return
@@ -145,7 +144,7 @@ def cmd_plan(args: argparse.Namespace) -> None:
     from walkie.ai.planner import ensure_plan
     from walkie.daylight import daylight_for
     from walkie.models import Proposal
-    from walkie.storage import read_json
+    from walkie.storage import read_record
     from walkie.weather import refresh_from_settings
 
     settings = config.load_settings()
@@ -154,12 +153,12 @@ def cmd_plan(args: argparse.Namespace) -> None:
     daylight = daylight_for(
         settings.lat, settings.lon, settings.timezone, on=clock.now().date()
     )
-    proposal = None
-    proposal_data = read_json(config.PROPOSAL_PATH)
-    if proposal_data:
-        candidate = Proposal.from_dict(proposal_data)
-        if candidate.for_date == clock.now().date().isoformat():
-            proposal = candidate
+    candidate = read_record(config.PROPOSAL_PATH, Proposal.from_dict)
+    proposal = (
+        candidate
+        if candidate is not None and candidate.for_date == clock.today_iso()
+        else None
+    )
     ensure_plan(
         base_plan, weather, daylight, proposal, force=args.force_new
     )

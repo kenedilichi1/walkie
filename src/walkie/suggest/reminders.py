@@ -6,13 +6,13 @@ import time
 from collections.abc import Callable
 from dataclasses import replace
 from datetime import datetime, timedelta
+from datetime import time as dtime
 from pathlib import Path
 
 from walkie import clock, config
-from walkie.clock import TIME_RE
 from walkie.log import get_logger
 from walkie.models import Proposal, TodayPlan, UserPlan, Weather
-from walkie.storage import read_json, write_json
+from walkie.storage import read_json, read_record, write_json
 from walkie.suggest.proposals import ensure_proposal
 from walkie.sync.notify import send_notification, with_quote
 from walkie.weather import refresh_from_settings
@@ -31,6 +31,22 @@ def reminder_message(proposal: Proposal) -> str:
     )
 
 
+def _today_walk(
+    now: datetime, proposal_path: Path, today_path: Path
+) -> tuple[Proposal, datetime] | None:
+    """Today's pending walk (proposal, target time); None when nothing to do."""
+    if today_path.exists():
+        return None  # already approved or edited
+    proposal = read_record(proposal_path, Proposal.from_dict)
+    if proposal is None or proposal.for_date != clock.today_iso(now):
+        return None  # never act on a missing or stale (yesterday's) proposal
+    parsed = clock.parse_hhmm(proposal.suggested_time)
+    if parsed is None:
+        return None
+    target = datetime.combine(now.date(), dtime(parsed[0], parsed[1]))
+    return proposal, target
+
+
 def check_reminders(
     now: datetime | None = None,
     notify_fn: NotifyFn | None = None,
@@ -41,21 +57,12 @@ def check_reminders(
     """Fire due reminders (T-30/T-15/T-5); auto-approve at walk time."""
     now = now or clock.now()
     notify_fn = notify_fn or send_notification
-    data = read_json(proposal_path)
-    if data is None or today_path.exists():
+    due = _today_walk(now, proposal_path, today_path)
+    if due is None:
         return []
-    proposal = Proposal.from_dict(data)
-    if proposal.for_date != now.date().isoformat():
-        return []  # never act on a stale (yesterday's) proposal
-    if not TIME_RE.match(proposal.suggested_time):
-        return []
-
-    target = datetime.combine(
-        now.date(),
-        datetime.strptime(proposal.suggested_time, "%H:%M").time(),
-    )
+    proposal, target = due
     state = read_json(state_path) or {}
-    fired = state.get("fired", []) if state.get("date") == now.strftime("%Y-%m-%d") else []
+    fired = state.get("fired", []) if state.get("date") == clock.today_iso(now) else []
     actions: list[str] = []
 
     for offset in REMINDER_OFFSETS_MIN:
@@ -80,7 +87,7 @@ def check_reminders(
         )
         actions.append("auto-approved")
 
-    write_json(state_path, {"date": now.strftime("%Y-%m-%d"), "fired": fired})
+    write_json(state_path, {"date": clock.today_iso(now), "fired": fired})
     return actions
 
 

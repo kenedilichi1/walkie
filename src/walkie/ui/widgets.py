@@ -3,20 +3,21 @@
 from PyQt6.QtCore import QTime
 from PyQt6.QtWidgets import QSpinBox, QTimeEdit
 
+from walkie import clock
+from walkie.policy import DEFAULT_HHMM, MAX_DURATION, MIN_DURATION
+
 
 def make_time_edit(value: str) -> QTimeEdit:
     """QTimeEdit showing 12h clock, holding an "HH:MM" string value."""
     edit = QTimeEdit()
     edit.setDisplayFormat("h:mm AP")
-    try:
-        hour, minute = (int(part) for part in value.split(":"))
-    except ValueError:
-        hour, minute = 12, 30  # tolerate hand-edited config
-    edit.setTime(QTime(hour, minute))
+    edit.setTime(QTime(*(clock.parse_hhmm(value) or DEFAULT_HHMM)))
     return edit
 
 
-def make_duration_spin(value: int, low: int = 5, high: int = 180) -> QSpinBox:
+def make_duration_spin(
+    value: int, low: int = MIN_DURATION, high: int = MAX_DURATION
+) -> QSpinBox:
     spin = QSpinBox()
     spin.setRange(low, high)
     spin.setSingleStep(5)

@@ -1,21 +1,8 @@
-import os
+from walkie.models import Intensity, LocationType, UserPlan
+from walkie.ui.app import ensure_app
+from walkie.ui.wizard import PlanWizard, load_saved_plan, save_plan
 
-os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-
-from PyQt6.QtWidgets import QApplication  # noqa: E402
-
-from walkie.models import (  # noqa: E402
-    Intensity,
-    LocationType,
-    UserPlan,
-)
-from walkie.ui.wizard import (  # noqa: E402
-    PlanWizard,
-    load_saved_plan,
-    save_plan,
-)
-
-app = QApplication.instance() or QApplication([])
+ensure_app()  # process-wide offscreen app (platform set in tests/conftest.py)
 
 
 def test_wizard_roundtrips_full_plan():

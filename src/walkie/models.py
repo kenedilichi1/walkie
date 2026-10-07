@@ -10,7 +10,11 @@ from dataclasses import dataclass, fields
 from enum import Enum
 from typing import Any, TypeVar
 
+from walkie.policy import DEFAULT_DURATION, DEFAULT_TIME
+
 E = TypeVar("E", bound=Enum)
+
+FINGERPRINT_UNAVAILABLE = "unavailable"
 
 
 class LocationType(str, Enum):
@@ -38,15 +42,15 @@ def _str(value: Any, default: str = "") -> str:
 
 def _int(value: Any, default: int) -> int:
     try:
-        return int(value)  # type: ignore[arg-type]
+        return int(value)
     except (TypeError, ValueError):
         return default
 
 
 @dataclass(frozen=True)
 class UserPlan:
-    preferred_time: str = "12:30"
-    duration_minutes: int = 30
+    preferred_time: str = DEFAULT_TIME
+    duration_minutes: int = DEFAULT_DURATION
     location_type: LocationType = LocationType.SHADE
     intensity: Intensity = Intensity.MODERATE
     area: str = ""
@@ -56,8 +60,8 @@ class UserPlan:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> UserPlan:
         return cls(
-            preferred_time=_str(data.get("preferred_time"), "12:30"),
-            duration_minutes=_int(data.get("duration_minutes"), 30),
+            preferred_time=_str(data.get("preferred_time"), DEFAULT_TIME),
+            duration_minutes=_int(data.get("duration_minutes"), DEFAULT_DURATION),
             location_type=_enum(
                 LocationType, data.get("location_type"), LocationType.SHADE
             ),
@@ -119,7 +123,7 @@ def _opt_float(value: Any) -> float | None:
     if value is None:
         return None
     try:
-        return float(value)  # type: ignore[arg-type]
+        return float(value)
     except (TypeError, ValueError):
         return None
 
@@ -151,12 +155,12 @@ class Daylight:
 @dataclass(frozen=True)
 class Proposal:
     suggested_time: str = ""
-    duration_minutes: int = 30
+    duration_minutes: int = DEFAULT_DURATION
     location_type: LocationType = LocationType.SHADE
     intensity: Intensity = Intensity.MODERATE
     area: str = ""
     weather_summary: str = ""
-    weather_fingerprint: str = "unavailable"
+    weather_fingerprint: str = FINGERPRINT_UNAVAILABLE
     reason: str = ""
     route_notes: str = ""
     created_at: str = ""
@@ -167,7 +171,7 @@ class Proposal:
     def from_dict(cls, data: dict[str, Any]) -> Proposal:
         return cls(
             suggested_time=_str(data.get("suggested_time")),
-            duration_minutes=_int(data.get("duration_minutes"), 30),
+            duration_minutes=_int(data.get("duration_minutes"), DEFAULT_DURATION),
             location_type=_enum(
                 LocationType, data.get("location_type"), LocationType.SHADE
             ),
@@ -175,7 +179,7 @@ class Proposal:
             area=_str(data.get("area")),
             weather_summary=_str(data.get("weather_summary")),
             weather_fingerprint=_str(
-                data.get("weather_fingerprint"), "unavailable"
+                data.get("weather_fingerprint"), FINGERPRINT_UNAVAILABLE
             ),
             reason=_str(data.get("reason")),
             route_notes=_str(data.get("route_notes")),
@@ -191,11 +195,10 @@ class Proposal:
         return data
 
     def approve(self, approved_at: str, approved_by: str) -> TodayPlan:
-        return TodayPlan(
-            **{f.name: getattr(self, f.name) for f in fields(self)},
-            approved_at=approved_at,
-            approved_by=approved_by,
-        )
+        # Proposal fields only: `self` may already be a TodayPlan, whose
+        # approval fields must not be passed in twice.
+        base = {f.name: getattr(self, f.name) for f in fields(Proposal)}
+        return TodayPlan(**base, approved_at=approved_at, approved_by=approved_by)
 
 
 @dataclass(frozen=True)
@@ -223,10 +226,13 @@ class TodayPlan(Proposal):
 class Plan:
     """Output of the AI decision engine (output/plans/plan.json)."""
 
+    SOURCE_LLM = "llm"
+    SOURCE_FALLBACK = "fallback"
+
     for_date: str = ""
     window_start: str = ""  # "HH:MM"
     window_end: str = ""  # computed: window_start + duration
-    duration_minutes: int = 30
+    duration_minutes: int = DEFAULT_DURATION
     location_type: LocationType = LocationType.SHADE
     intensity: Intensity = Intensity.MODERATE
     area: str = ""
@@ -234,10 +240,10 @@ class Plan:
     sunset: str | None = None
     daylight_minutes: int = 0
     weather_summary: str = ""
-    weather_fingerprint: str = "unavailable"
+    weather_fingerprint: str = FINGERPRINT_UNAVAILABLE
     reason: str = ""
     route_notes: str = ""
-    source: str = "fallback"  # llm | fallback
+    source: str = SOURCE_FALLBACK  # llm | fallback
     created_at: str = ""
 
     @classmethod
@@ -246,7 +252,7 @@ class Plan:
             for_date=_str(data.get("for_date")),
             window_start=_str(data.get("window_start")),
             window_end=_str(data.get("window_end")),
-            duration_minutes=_int(data.get("duration_minutes"), 30),
+            duration_minutes=_int(data.get("duration_minutes"), DEFAULT_DURATION),
             location_type=_enum(
                 LocationType, data.get("location_type"), LocationType.SHADE
             ),
@@ -257,11 +263,11 @@ class Plan:
             daylight_minutes=_int(data.get("daylight_minutes"), 0),
             weather_summary=_str(data.get("weather_summary")),
             weather_fingerprint=_str(
-                data.get("weather_fingerprint"), "unavailable"
+                data.get("weather_fingerprint"), FINGERPRINT_UNAVAILABLE
             ),
             reason=_str(data.get("reason")),
             route_notes=_str(data.get("route_notes")),
-            source=_str(data.get("source"), "fallback"),
+            source=_str(data.get("source"), cls.SOURCE_FALLBACK),
             created_at=_str(data.get("created_at")),
         )
 

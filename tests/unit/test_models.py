@@ -91,6 +91,20 @@ def test_today_plan_keeps_proposal_and_approval_fields():
     assert "for_date" in data
 
 
+def test_approve_works_on_a_today_plan_instance():
+    """Re-approving an already-approved record must not pass its own fields twice."""
+    record = TodayPlan.from_dict(
+        {
+            "suggested_time": "16:30",
+            "approved_at": "2026-10-07T16:05:00",
+            "approved_by": "auto",
+        }
+    )
+    again = record.approve("2026-10-07T16:31:00", approved_by="edit")
+    assert again.approved_by == "edit"
+    assert again.suggested_time == "16:30"
+
+
 def test_weather_from_partial_dict():
     weather = Weather.from_dict({"summary": "overcast", "temperature_2m": 27.8})
     assert weather.summary == "overcast"

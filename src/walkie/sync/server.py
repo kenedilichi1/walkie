@@ -71,7 +71,8 @@ class _Handler(SimpleHTTPRequestHandler):
     """Serves `directory` only; `/` is the walkie landing page."""
 
     def do_GET(self) -> None:  # noqa: N802 - http.server API
-        if self.path in ("/", "/index.html"):
+        path = self.path.split("?", 1)[0]  # "/?v=1" is still the landing page
+        if path in ("/", "/index.html"):
             body = index_html(Path(self.directory))
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -87,12 +88,18 @@ class _Handler(SimpleHTTPRequestHandler):
 
 def start_server(
     directory: Path = config.OUTPUT_DIR,
-    host: str = "0.0.0.0",
+    host: str | None = None,
     port: int = 8000,
 ) -> ThreadingHTTPServer:
-    """Bind without blocking — `serve()` runs the loop, tests call this."""
+    """Bind without blocking — `serve()` runs the loop, tests call this.
+
+    The default bind is the LAN address rather than 0.0.0.0: these files
+    are for the phone on the same Wi-Fi, not for every interface.
+    """
     if not directory.is_dir():
         raise SyncError(f"{directory} not found — run a walkie command first")
+    if host is None:
+        host = lan_ip()
     handler = functools.partial(_Handler, directory=str(directory))
     try:
         return ThreadingHTTPServer((host, port), handler)
@@ -102,13 +109,13 @@ def start_server(
 
 def serve(
     directory: Path = config.OUTPUT_DIR,
-    host: str = "0.0.0.0",
+    host: str | None = None,
     port: int = 8000,
 ) -> None:
     """Block, serving `directory` to the LAN until Ctrl-C."""
     httpd = start_server(directory, host, port)
     bound_port = int(httpd.server_address[1])
-    ip = lan_ip()
+    ip = str(httpd.server_address[0])
     log.info(
         f"Serving {directory} — open on your phone (same Wi-Fi):"
     )

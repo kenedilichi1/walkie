@@ -88,6 +88,9 @@ def test_landing_page_lists_files_and_serves_gpx(tmp_path):
         assert "walk_audio.mp3" in page
         assert "missing" in page  # voice not built in this fixture
 
+        with urllib.request.urlopen(f"{base}/?v=1", timeout=5) as resp:
+            assert resp.status == 200  # a query string still hits the page
+
         with urllib.request.urlopen(f"{base}/routes/walk.gpx", timeout=5) as resp:
             assert resp.status == 200
             assert resp.read() == b"<gpx version='1.1'/>"

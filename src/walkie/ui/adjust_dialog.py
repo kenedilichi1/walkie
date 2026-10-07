@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 from PyQt6.QtWidgets import (
-    QApplication,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
@@ -16,6 +14,7 @@ from PyQt6.QtWidgets import (
 from walkie import config
 from walkie.models import Proposal, TodayPlan
 from walkie.suggest.reminders import write_today_plan
+from walkie.ui.app import ensure_app
 from walkie.ui.widgets import make_duration_spin, make_time_edit
 
 
@@ -25,8 +24,7 @@ def open_adjust_dialog(
     today_path: Path = config.TODAY_PLAN_PATH,
 ) -> bool:
     """Quick edit window (time/duration); returns False if cancelled."""
-    if QApplication.instance() is None:
-        QApplication(sys.argv)
+    ensure_app()
     dialog = QDialog()
     dialog.setWindowTitle("Adjust today's walk")
     current: Proposal = existing or proposal

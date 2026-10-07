@@ -11,6 +11,7 @@ from walkie.models import (
     UserPlan,
     Weather,
 )
+from walkie.policy import MAX_DURATION, MAX_HOUR, MIN_DURATION
 
 NOW = datetime.fromisoformat("2026-10-07T09:00")
 DAYLIGHT = Daylight(
@@ -30,14 +31,23 @@ def test_parse_llm_plan_valid():
     data = planner.parse_llm_plan(text)
     assert data["window_start"] == "17:00"
     assert data["duration_minutes"] == 45
+    # in-policy boundaries are accepted
+    assert planner.parse_llm_plan(
+        f'{{"window_start":"{MAX_HOUR:02d}:00","duration_minutes":{MAX_DURATION}}}'
+    )
 
 
 def test_parse_llm_plan_rejects_garbage():
     assert planner.parse_llm_plan("no json here") is None
     assert planner.parse_llm_plan('{"window_start":"05:59","duration_minutes":30}') is None
     assert planner.parse_llm_plan('{"window_start":"21:01","duration_minutes":30}') is None
-    assert planner.parse_llm_plan('{"window_start":"12:00","duration_minutes":4}') is None
-    assert planner.parse_llm_plan('{"window_start":"12:00","duration_minutes":121}') is None
+    assert planner.parse_llm_plan('{"window_start":"12:75","duration_minutes":30}') is None
+    assert planner.parse_llm_plan(
+        f'{{"window_start":"12:00","duration_minutes":{MIN_DURATION - 1}}}'
+    ) is None
+    assert planner.parse_llm_plan(
+        f'{{"window_start":"12:00","duration_minutes":{MAX_DURATION + 1}}}'
+    ) is None
     assert planner.parse_llm_plan('{"window_start":"12:00","duration_minutes":30,'
                                   '"location_type":"beach"}') is None
     assert planner.parse_llm_plan('{"window_start":"12:00","duration_minutes":30,'
@@ -149,13 +159,39 @@ def test_ensure_plan_regenerates_on_new_day(tmp_path):
 def test_call_llm_passes_system_prompt(monkeypatch):
     captured = {}
 
-    def fake_complete_json(prompt, **kwargs):
+    def fake_complete(prompt, **kwargs):
         captured.update(kwargs)
         captured["prompt"] = prompt
-        return {"window_start": "17:00"}
+        return '{"window_start": "17:00", "duration_minutes": 45}'
 
-    monkeypatch.setattr(planner, "complete_json", fake_complete_json)
+    monkeypatch.setattr(planner, "complete", fake_complete)
     result = planner.call_llm("structured inputs here")
-    assert result == {"window_start": "17:00"}
+    assert result == {"window_start": "17:00", "duration_minutes": 45}
     assert captured["system"] == planner.SYSTEM_PROMPT
     assert captured["prompt"] == "structured inputs here"
+
+
+def test_call_llm_rejects_out_of_policy_reply(monkeypatch):
+    """The validator runs on the production path, not only in unit tests."""
+    monkeypatch.setattr(
+        planner,
+        "complete",
+        lambda prompt, **kwargs: '{"window_start": "25:00", "duration_minutes": 45}',
+    )
+    assert planner.call_llm("structured inputs here") is None
+
+
+def test_ensure_plan_ignores_unusable_llm_reply(tmp_path):
+    """A malformed reply falls back to the inputs instead of crashing."""
+    plan_path = tmp_path / "plan.json"
+    base = UserPlan(preferred_time="16:30", duration_minutes=30)
+
+    def llm_fn(prompt):
+        return {"window_start": "25:00", "duration_minutes": 45, "reason": "bad"}
+
+    plan = planner.ensure_plan(
+        base, None, DAYLIGHT, now=NOW, plan_path=plan_path, llm_fn=llm_fn
+    )
+    assert plan.window_start == "16:30"
+    assert plan.duration_minutes == 30
+    assert plan.source == Plan.SOURCE_FALLBACK

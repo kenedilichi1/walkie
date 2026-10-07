@@ -1,13 +1,12 @@
 """Step 5: offline route builder — fixture grid PBF -> loop -> walk.gpx.
 
-Grid fixture: 6x6 nodes at ~222 m spacing around (6.0, 8.0), horizontal +
-vertical residential ways (like real blocks). An 11-minute target (891 m)
-resolves to one square block (888 m) closing at the start node.
+The grid fixture (6x6 nodes at ~222 m spacing around (6.0, 8.0), horizontal
++ vertical residential ways) lives in grid_fixture.py; an 11-minute target
+(891 m) resolves to one square block (888 m) closing at the start node.
 """
 
 from __future__ import annotations
 
-import math
 from datetime import datetime
 from datetime import timezone as tz
 from pathlib import Path
@@ -16,50 +15,13 @@ import gpxpy
 import networkx as nx
 import osmium
 import pytest
+from grid_fixture import LAT0, LON0, STEP, write_grid_pbf
 
 from walkie import config
 from walkie.media.voice import AudioSpec, build_walk_audio, parse_walk
 from walkie.routing import RouteError, builder
 
-LAT0, LON0 = 6.0, 8.0
-STEP = 0.002  # ~222 m
 START = datetime(2026, 10, 7, 16, 30, tzinfo=tz.utc)
-
-
-def write_grid_pbf(path: Path, tags: dict[str, str] | None = None) -> Path:
-    """Write a 6x6 street grid; ways are one row/column each."""
-    tags = tags or {"highway": "residential"}
-    path.unlink(missing_ok=True)
-    writer = osmium.SimpleWriter(str(path))
-    node_id = 1
-    coords: dict[tuple[int, int], int] = {}
-    lon_step = STEP / math.cos(math.radians(LAT0))
-    for r in range(6):
-        for c in range(6):
-            lat = LAT0 + r * STEP
-            lon = LON0 + c * lon_step
-            writer.add_node(
-                osmium.osm.mutable.Node(id=node_id, location=(lon, lat), tags={})
-            )
-            coords[(r, c)] = node_id
-            node_id += 1
-    way_id = 100
-    for r in range(6):  # east-west rows
-        writer.add_way(
-            osmium.osm.mutable.Way(
-                id=way_id, tags=tags, nodes=[coords[(r, c)] for c in range(6)]
-            )
-        )
-        way_id += 1
-    for c in range(6):  # north-south columns
-        writer.add_way(
-            osmium.osm.mutable.Way(
-                id=way_id, tags=tags, nodes=[coords[(r, c)] for r in range(6)]
-            )
-        )
-        way_id += 1
-    writer.close()
-    return path
 
 
 def route(tmp_path: Path, minutes: int = 11, **kwargs) -> builder.RouteResult:

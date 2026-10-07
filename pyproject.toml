@@ -26,6 +26,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest",
+    "pytest-cov",
     "ruff",
     "mypy",
 ]
@@ -47,12 +48,15 @@ line-length = 100
 src = ["src", "tests"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "W", "PLR0913"]
+select = ["E", "F", "I", "UP", "B", "W", "C4", "SIM", "RET", "PLR0913"]
 
 [tool.ruff.lint.pylint]
-max-args = 13
+max-args = 9  # the honest ceiling: build_route() takes 9
 
 [tool.mypy]
 python_version = "3.10"
+mypy_path = "src"
+explicit_package_bases = true
 ignore_missing_imports = true
-packages = ["walkie"]
+strict = true
+files = ["src/walkie"]

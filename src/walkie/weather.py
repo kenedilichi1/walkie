@@ -6,14 +6,24 @@ Also home of the weather summary/fingerprint used in prompts and validity.
 
 from __future__ import annotations
 
-import time
+from dataclasses import replace
 from pathlib import Path
+from typing import Any
 
 import requests
 
-from walkie.config import Settings
-from walkie.models import Weather
-from walkie.storage import read_json, write_json
+from walkie import clock
+from walkie.config import DEFAULT_FORECAST_URL, Settings
+from walkie.log import get_logger
+from walkie.models import FINGERPRINT_UNAVAILABLE, Weather
+from walkie.storage import read_record, write_json
+
+log = get_logger("weather")
+
+FORECAST_TIMEOUT_S = 15
+DEFAULT_MAX_AGE_HOURS = 2.0
+# fingerprint buckets: rain probability (<= limit) -> label
+RAIN_BUCKETS = ((10, "low"), (30, "mild"), (60, "med"))
 
 WMO_SUMMARY = {
     0: "clear sky",
@@ -55,7 +65,7 @@ def fetch_forecast(
     lat: float,
     lon: float,
     timezone_name: str,
-    url: str = "https://api.open-meteo.com/v1/forecast",
+    url: str = DEFAULT_FORECAST_URL,
 ) -> Weather | None:
     """Fetch today's forecast; returns compact Weather, or None on failure."""
     try:
@@ -73,47 +83,54 @@ def fetch_forecast(
         response = requests.get(
             url,
             params=params,
-            timeout=15,
+            timeout=FORECAST_TIMEOUT_S,
         )
         response.raise_for_status()
         return compact_forecast(response.json(), timezone_name)
-    except (requests.RequestException, KeyError, ValueError):
+    except (requests.RequestException, KeyError, TypeError, ValueError) as exc:
+        log.warning(f"forecast fetch failed ({exc}) — falling back to cache")
         return None
 
 
-def compact_forecast(raw: dict, timezone_name: str) -> Weather:
-    """Reduce an Open-Meteo response to the fields walkie cares about."""
-    current = raw.get("current", {})
-    hourly = raw.get("hourly", {})
-    temps = hourly.get("temperature_2m") or [current.get("temperature_2m", 0.0)]
-    rain_probs = hourly.get("precipitation_probability") or [0]
-    weather_code = int(current.get("weather_code", -1))
-    return Weather(
-        fetched_at=int(time.time()),
-        timezone=timezone_name,
-        summary=describe_weather_code(weather_code),
-        weather_code=weather_code,
-        temperature_2m=current.get("temperature_2m"),
-        temperature_2m_min=min(t for t in temps if t is not None),
-        temperature_2m_max=max(t for t in temps if t is not None),
-        precipitation_mm=current.get("precipitation", 0.0),
-        precipitation_probability_max=max(
-            (p for p in rain_probs if p is not None), default=0
-        ),
-        wind_speed_10m=current.get("wind_speed_10m"),
-        cloud_cover=current.get("cloud_cover"),
+def compact_forecast(raw: dict[str, Any], timezone_name: str) -> Weather:
+    """Reduce an Open-Meteo response to the fields walkie cares about.
+
+    Missing or null samples are dropped field by field: an empty hourly
+    list yields None min/max instead of failing the whole forecast.
+    """
+    current = raw.get("current") or {}
+    hourly = raw.get("hourly") or {}
+    temps = [t for t in hourly.get("temperature_2m") or [] if t is not None]
+    if not temps:
+        temps = [t for t in [current.get("temperature_2m")] if t is not None]
+    rain_probs = [
+        p for p in hourly.get("precipitation_probability") or [] if p is not None
+    ]
+    weather = Weather.from_dict(
+        {
+            "fetched_at": int(clock.now().timestamp()),
+            "timezone": timezone_name,
+            "weather_code": current.get("weather_code", -1),
+            "temperature_2m": current.get("temperature_2m"),
+            "temperature_2m_min": min(temps, default=None),
+            "temperature_2m_max": max(temps, default=None),
+            "precipitation_mm": current.get("precipitation", 0.0),
+            "precipitation_probability_max": max(rain_probs, default=0),
+            "wind_speed_10m": current.get("wind_speed_10m"),
+            "cloud_cover": current.get("cloud_cover"),
+        }
     )
+    return replace(weather, summary=describe_weather_code(weather.weather_code))
 
 
 def load_cache(cache_path: Path) -> Weather | None:
-    data = read_json(cache_path)
-    return Weather.from_dict(data) if data is not None else None
+    return read_record(cache_path, Weather.from_dict)
 
 
-def is_stale(cache: Weather | None, max_age_hours: float = 2.0) -> bool:
+def is_stale(cache: Weather | None, max_age_hours: float = DEFAULT_MAX_AGE_HOURS) -> bool:
     if cache is None:
         return True
-    return (time.time() - cache.fetched_at) > max_age_hours * 3600
+    return (clock.now().timestamp() - cache.fetched_at) > max_age_hours * 3600
 
 
 def save_cache(cache_path: Path, weather: Weather) -> None:
@@ -125,8 +142,8 @@ def refresh_if_stale(
     lat: float,
     lon: float,
     timezone_name: str,
-    url: str = "https://api.open-meteo.com/v1/forecast",
-    max_age_hours: float = 2.0,
+    url: str = DEFAULT_FORECAST_URL,
+    max_age_hours: float = DEFAULT_MAX_AGE_HOURS,
     force: bool = False,
 ) -> Weather | None:
     """Return fresh weather, refetching only when the cache is stale/missing."""
@@ -142,7 +159,7 @@ def refresh_if_stale(
 
 def refresh_from_settings(
     settings: Settings,
-    max_age_hours: float = 2.0,
+    max_age_hours: float = DEFAULT_MAX_AGE_HOURS,
     force: bool = False,
 ) -> Weather | None:
     """refresh_if_stale wired from validated settings."""
@@ -160,28 +177,34 @@ def refresh_from_settings(
 def weather_fingerprint(weather: Weather | None) -> str:
     """Bucketed fingerprint: stable across jitter, flips when conditions change."""
     if weather is None:
-        return "unavailable"
-    temp = weather.temperature_2m or 0.0
-    rain = weather.precipitation_probability_max or 0
+        return FINGERPRINT_UNAVAILABLE
+    temp = weather.temperature_2m
+    temp_bucket = "?" if temp is None else f"{round(temp / 5) * 5:.0f}C"
+    rain = weather.precipitation_probability_max
     rain_bucket = next(
-        (
-            label
-            for limit, label in ((10, "low"), (30, "mild"), (60, "med"))
-            if rain <= limit
-        ),
+        (label for limit, label in RAIN_BUCKETS if rain <= limit),
         "high",
     )
-    return f"{weather.summary}|{round(temp / 5) * 5:.0f}C|{rain_bucket}"
+    return f"{weather.summary}|{temp_bucket}|{rain_bucket}"
 
 
 def weather_line(weather: Weather | None) -> str:
     if weather is None:
         return "weather unavailable (offline)"
-    temp = weather.temperature_2m
-    high = weather.temperature_2m_max or temp
-    return (
-        f"{weather.summary or 'unknown'}, {temp}C "
-        f"(high {high}C), "
-        f"rain chance {weather.precipitation_probability_max}%, "
-        f"wind {weather.wind_speed_10m or '?'} km/h"
+    high = (
+        weather.temperature_2m_max
+        if weather.temperature_2m_max is not None
+        else weather.temperature_2m
     )
+    wind = weather.wind_speed_10m
+    return (
+        f"{weather.summary or 'unknown'}, {_deg(weather.temperature_2m)} "
+        f"(high {_deg(high)}), "
+        f"rain chance {weather.precipitation_probability_max}%, "
+        f"wind {wind if wind is not None else '?'} km/h"
+    )
+
+
+def _deg(value: float | None) -> str:
+    """A temperature for prompt text; '?' instead of the literal 'None'."""
+    return f"{value}C" if value is not None else "?C"
