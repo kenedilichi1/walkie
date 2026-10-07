@@ -1,6 +1,6 @@
 import pytest
 
-from walkie import cli
+from walkie import cli, config
 
 
 def test_parser_suggest_flags():
@@ -29,6 +29,14 @@ def test_parser_plan_flags():
     args = cli.build_parser().parse_args(["plan", "--force-new"])
     assert args.command == "plan"
     assert args.force_new is True
+
+
+def test_parser_voice_defaults_to_walk_gpx(tmp_path):
+    args = cli.build_parser().parse_args(["voice"])
+    assert args.command == "voice"
+    assert args.gpx == config.DEFAULT_WALK_GPX
+    args = cli.build_parser().parse_args(["voice", "--gpx", str(tmp_path / "a.gpx")])
+    assert args.gpx == tmp_path / "a.gpx"
 
 
 def test_main_exit_codes(monkeypatch):

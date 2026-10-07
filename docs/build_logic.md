@@ -13,11 +13,13 @@ Pipeline order (each stage reads only config/, data/, and prior stage output/):
    `output/plans/plan.json` (falls back to the inputs when the model is
    unreachable or replies garbage)
 5. Route builder + GPX export -> `output/routes/walk.gpx`
-6. Playlist matcher + voice cues -> `output/audio/playlist.json`, `walk_final.mp3`
+6. `walkie voice` — read `output/routes/walk.gpx`, narrate the turns with
+   local Piper TTS -> `output/audio/walk_audio.mp3` (spoken cues only — no
+   playlist matching; play your own music alongside it)
 7. Sync — OS notification + local file drop to phone
 
-Entry points: `make wizard|region|suggest|plan|remind|daemon` — all of them
-run `python -m walkie <cmd>` (or the `walkie` console script after
+Entry points: `make wizard|region|suggest|plan|voice|remind|daemon` — all of
+them run `python -m walkie <cmd>` (or the `walkie` console script after
 `pip install -e .`).
 
 Code layout (`src/walkie/`):
@@ -31,6 +33,7 @@ Code layout (`src/walkie/`):
 - `weather.py` — Open-Meteo fetch, staleness cache, prompt fingerprint
 - `daylight.py` — sunrise/sunset/day length (astral, offline)
 - `ai/` — planning system prompt + decision engine (plan.json)
+- `media/` — GPX turn narration (Piper TTS, voice-only MP3)
 - `suggest/` — prompts, proposals, reminders
 - `ui/` — setup wizard, quick-adjust dialog, shared widgets
 - `region.py` — Geofabrik extract detection + download

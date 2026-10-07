@@ -4,6 +4,7 @@
     walkie region [--dry-run ...]     detect location, fetch OSM extract
     walkie suggest [--edit|--force]   build today's walk proposal
     walkie plan [--force-new]         build today's plan (decision engine)
+    walkie voice [--gpx PATH]         narrate route turns -> walk_audio.mp3
     walkie remind                     fire due reminders once
     walkie daemon                     loop reminder checks until approved
 """
@@ -12,9 +13,11 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Callable, Sequence
+from pathlib import Path
 
 from walkie import config, region
 from walkie.log import get_logger, setup
+from walkie.media.voice import VoiceError
 
 log = get_logger("cli")
 
@@ -54,6 +57,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("remind", help="fire due reminders once, then exit")
     sub.add_parser("daemon", help="loop reminder checks until approved")
+
+    voice_parser = sub.add_parser(
+        "voice", help="narrate route turns -> output/audio/walk_audio.mp3"
+    )
+    voice_parser.add_argument(
+        "--gpx", type=Path, default=config.DEFAULT_WALK_GPX,
+        help="GPX track to narrate (default: output/routes/walk.gpx)",
+    )
     return parser
 
 
@@ -121,6 +132,13 @@ def cmd_plan(args: argparse.Namespace) -> None:
     )
 
 
+def cmd_voice(args: argparse.Namespace) -> None:
+    from walkie.media.voice import build_walk_audio
+
+    settings = config.load_settings()
+    build_walk_audio(args.gpx, voice_model=settings.voice_model)
+
+
 def cmd_remind(args: argparse.Namespace) -> None:
     from walkie.suggest.reminders import check_reminders
 
@@ -139,6 +157,7 @@ HANDLERS: dict[str, Callable[[argparse.Namespace], None]] = {
     "region": cmd_region,
     "suggest": cmd_suggest,
     "plan": cmd_plan,
+    "voice": cmd_voice,
     "remind": cmd_remind,
     "daemon": cmd_daemon,
 }
@@ -150,7 +169,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         HANDLERS[args.command](args)
-    except (config.ConfigError, region.RegionError) as exc:
+    except (config.ConfigError, region.RegionError, VoiceError) as exc:
         log.error(f"error: {exc}")
         return 1
     except KeyboardInterrupt:

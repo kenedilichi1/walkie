@@ -3,17 +3,18 @@
 Offline-first walk planner. Asks your preferences once, checks local weather,
 picks today's best walk window with a local LLM (Ollama), reminds you before
 it starts — and (later steps) builds a walking loop from an offline OSM
-extract, matches a playlist, generates voice cues, and drops everything to
-your phone over local WiFi. No cloud required after setup.
+extract, narrates the turns with local voice cues (play your own music
+alongside it), and drops everything to your phone over local WiFi. No cloud
+required after setup.
 
 ## Layout
 
 ```
 walkie/
 ├── config/          # settings.yaml (region, paths), user_plan.json, quotes.txt
-├── data/            # inputs: .pbf extracts, music/ (never written by the app)
+├── data/            # inputs: .pbf extracts, piper voices/, music/ (never written by the app)
 ├── src/walkie/      # all code (installable via src/ layout)
-│   ├── cli.py       # walkie wizard|region|suggest|remind|daemon
+│   ├── cli.py       # walkie wizard|region|suggest|plan|voice|remind|daemon
 │   ├── config.py    # paths + validated settings (ConfigError)
 │   ├── models.py    # UserPlan / Weather / Proposal / TodayPlan dataclasses
 │   ├── storage.py   # atomic JSON helpers
@@ -21,6 +22,7 @@ walkie/
 │   ├── weather.py   # Open-Meteo fetch + staleness-aware cache
 │   ├── daylight.py  # sunrise/sunset/day length (astral, offline)
 │   ├── ai/          # planning prompt + decision engine (plan.json)
+│   ├── media/       # GPX turn narration (Piper TTS, voice-only mp3)
 │   ├── suggest/     # prompts / proposals / reminders
 │   ├── ui/          # setup wizard + quick-adjust dialog (PyQt6)
 │   ├── region.py    # Geofabrik OSM extract fetch
@@ -39,6 +41,7 @@ make region       # re-detect location / fetch OSM extract
 make wizard       # one-time preference setup (PyQt)
 make suggest      # today's walk proposal (weather + local LLM)
 make plan         # AI decision engine -> output/plans/plan.json
+make voice        # narrate route turns -> output/audio/walk_audio.mp3
 make daemon       # reminders until today's walk is approved
 make test         # pytest
 make lint         # ruff
@@ -50,5 +53,6 @@ Every `make` target is just `python -m walkie <command>`; after
 
 ```bash
 walkie suggest --edit   # quick-adjust today's walk
+walkie voice            # voice cues for output/routes/walk.gpx (own music: your player)
 walkie remind           # fire due reminders once (cron-friendly)
 ```
