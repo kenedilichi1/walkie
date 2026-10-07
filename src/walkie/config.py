@@ -7,7 +7,8 @@ module hardcodes ROOT-relative paths.
 
 from __future__ import annotations
 
-import random
+import math
+import secrets
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -70,7 +71,8 @@ def _resolve(raw: str) -> Path:
 def _validate_location(lat: float, lon: float) -> None:
     if not (-90.0 <= lat <= 90.0) or not (-180.0 <= lon <= 180.0):
         raise ConfigError(f"location out of range (lat={lat}, lon={lon})")
-    if lat == 0.0 and lon == 0.0:
+    if math.hypot(lat, lon) < 1e-9:
+        # within ~0.1 mm of (0,0): the example placeholders, not a real place
         raise ConfigError("location not configured — run: make region")
 
 
@@ -124,7 +126,7 @@ def load_quotes(path: Path = QUOTES_PATH) -> list[str]:
 
 
 def pick_quote(path: Path = QUOTES_PATH) -> str:
-    return random.choice(load_quotes(path))
+    return secrets.choice(load_quotes(path))
 
 
 def load_user_plan(path: Path = USER_PLAN_PATH) -> UserPlan:

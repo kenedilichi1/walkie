@@ -1,6 +1,8 @@
 import time
 from dataclasses import replace
 
+import pytest
+
 from walkie.models import Weather
 from walkie.weather import (
     compact_forecast,
@@ -35,8 +37,8 @@ def test_compact_forecast_reduces_payload():
     }
     result = compact_forecast(raw, "Africa/Lagos")
     assert result.summary == "overcast"
-    assert result.temperature_2m_min == 24.0
-    assert result.temperature_2m_max == 31.2
+    assert result.temperature_2m_min == pytest.approx(24.0)
+    assert result.temperature_2m_max == pytest.approx(31.2)
     assert result.precipitation_probability_max == 95
     assert result.timezone == "Africa/Lagos"
 

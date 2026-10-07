@@ -299,16 +299,8 @@ def _download_extract(extract_url: str, dest: Path) -> None:
         raise
 
 
-def run(args: argparse.Namespace) -> int:
-    try:
-        _run(args)
-    except RegionError as exc:
-        log.error(f"error: {exc}")
-        return 1
-    return 0
-
-
-def _run(args: argparse.Namespace) -> None:
+def execute(args: argparse.Namespace) -> None:
+    """Run the fetch; raises RegionError with a user-facing message on failure."""
     lat, lon, country_name, country_code, timezone_name = _resolve_location(args)
 
     continents = geofabrik_continents()

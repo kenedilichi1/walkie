@@ -39,6 +39,19 @@ def test_load_settings_rejects_null_island(tmp_path):
         config.load_settings(path)
 
 
+def test_load_settings_rejects_sub_mm_null_island(tmp_path):
+    path = write_settings(tmp_path, "location:\n  lat: 1e-12\n  lon: 1e-12\n")
+    with pytest.raises(ConfigError, match="make region"):
+        config.load_settings(path)
+
+
+def test_load_settings_accepts_near_zero_real_coordinates(tmp_path):
+    # equator / prime-meridian adjacent is a real place, unlike the placeholders
+    path = write_settings(tmp_path, "location:\n  lat: 0.0001\n  lon: 0.0\n")
+    settings = config.load_settings(path)
+    assert settings.lat == pytest.approx(0.0001)
+
+
 def test_load_settings_rejects_out_of_range(tmp_path):
     path = write_settings(tmp_path, "location:\n  lat: 91.0\n  lon: 8.1\n")
     with pytest.raises(ConfigError, match="out of range"):

@@ -1,3 +1,5 @@
+import pytest
+
 from walkie.models import (
     Intensity,
     LocationType,
@@ -90,6 +92,6 @@ def test_today_plan_keeps_proposal_and_approval_fields():
 def test_weather_from_partial_dict():
     weather = Weather.from_dict({"summary": "overcast", "temperature_2m": 27.8})
     assert weather.summary == "overcast"
-    assert weather.temperature_2m == 27.8
+    assert weather.temperature_2m == pytest.approx(27.8)
     assert weather.temperature_2m_max is None
     assert weather.fetched_at == 0

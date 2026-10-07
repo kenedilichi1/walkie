@@ -153,19 +153,19 @@ def confirm_with_user(plan: UserPlan) -> UserPlan | None:
         plan = wizard.plan()
 
 
-def run_setup() -> int:
+def run_setup() -> None:
     app = QApplication.instance() or QApplication(sys.argv)
     app.setApplicationName("walkie-setup")
 
     wizard = PlanWizard()
     if not wizard.exec():
         log.info("Setup cancelled.")
-        return 0
+        return
 
     plan = confirm_with_user(wizard.plan())
     if plan is None:
         log.info("Setup cancelled.")
-        return 0
+        return
 
     record = save_plan(plan)
     QMessageBox.information(
@@ -174,4 +174,3 @@ def run_setup() -> int:
         f"Plan saved to {config.USER_PLAN_PATH.name}.\n\n“{record.quote}”",
     )
     log.info(f"Saved plan to {config.USER_PLAN_PATH}")
-    return 0
