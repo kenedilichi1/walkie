@@ -25,7 +25,6 @@ from walkie.models import (
     UserPlan,
     Weather,
 )
-from walkie.policy import MAX_DURATION, MAX_HOUR, MIN_DURATION, MIN_HOUR
 from walkie.storage import read_record, write_json
 from walkie.weather import weather_fingerprint, weather_line
 
@@ -45,16 +44,23 @@ def _enum_or(value: object, enum_cls: type[E], default: E) -> E:
         return default
 
 
-def _reply_ok(data: dict[str, Any]) -> bool:
-    """Shape/range checks for one model reply — the trust boundary."""
-    parsed = clock.parse_hhmm(data.get("window_start"))
-    if parsed is None:
-        return False
-    hour, minute = parsed
-    if not (MIN_HOUR <= hour <= MAX_HOUR) or (hour == MAX_HOUR and minute > 0):
-        return False
-    duration = data.get("duration_minutes")
-    if not (isinstance(duration, int) and MIN_DURATION <= duration <= MAX_DURATION):
+def _reply_ok(
+    data: dict[str, Any],
+    preferred_time: str,
+    preferred_duration: int,
+) -> bool:
+    """Shape/window checks for one model reply — the trust boundary.
+
+    The model may only nudge the preferred time/duration inside
+    policy.time_window_for / duration_window_for, and may only choose
+    known location/intensity values.
+    """
+    if not policy.reply_within_window(
+        data.get("window_start"),
+        data.get("duration_minutes"),
+        preferred_time,
+        preferred_duration,
+    ):
         return False
     location_type = data.get("location_type")
     intensity = data.get("intensity")
@@ -67,16 +73,33 @@ def _reply_ok(data: dict[str, Any]) -> bool:
     return location_ok and intensity_ok
 
 
-def parse_llm_plan(text: str) -> dict[str, Any] | None:
+def parse_llm_plan(
+    text: str,
+    base_plan: UserPlan,
+    proposal: Proposal | None = None,
+) -> dict[str, Any] | None:
     """Extract and validate the planning JSON from an LLM reply."""
+    preferred_time = proposal.suggested_time if proposal else base_plan.preferred_time
+    preferred_duration = (
+        proposal.duration_minutes if proposal else base_plan.duration_minutes
+    )
     data = extract_json(text)
-    return data if data is not None and _reply_ok(data) else None
+    return (
+        data
+        if data is not None
+        and _reply_ok(data, preferred_time, preferred_duration)
+        else None
+    )
 
 
-def call_llm(user_prompt: str) -> dict[str, Any] | None:
+def call_llm(
+    user_prompt: str,
+    base_plan: UserPlan,
+    proposal: Proposal | None = None,
+) -> dict[str, Any] | None:
     """Best-effort structured reply; None when unreachable or unusable."""
     text = complete(user_prompt, system=SYSTEM_PROMPT)
-    return parse_llm_plan(text) if text else None
+    return parse_llm_plan(text, base_plan, proposal) if text else None
 
 
 def make_plan(
@@ -171,8 +194,17 @@ def ensure_plan(
     if existing and not force and plan_is_valid(existing, weather, now):
         log.info("Reusing today's plan.")
         return existing
-    llm = (llm_fn or call_llm)(build_user_prompt(base_plan, weather, daylight, proposal))
-    if llm and not _reply_ok(llm):
+    preferred_time = proposal.suggested_time if proposal else base_plan.preferred_time
+    preferred_duration = (
+        proposal.duration_minutes if proposal else base_plan.duration_minutes
+    )
+    prompt = build_user_prompt(base_plan, weather, daylight, proposal)
+    llm = (
+        llm_fn(prompt)
+        if llm_fn
+        else call_llm(prompt, base_plan, proposal)
+    )
+    if llm and not _reply_ok(llm, preferred_time, preferred_duration):
         log.warning(f"Ignoring unusable model reply: {llm!r}")
         llm = None
     plan = make_plan(base_plan, weather, daylight, proposal, llm, now)

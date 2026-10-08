@@ -3,13 +3,7 @@
 from __future__ import annotations
 
 from walkie.models import Daylight, Proposal, UserPlan, Weather
-from walkie.policy import (
-    MAX_DURATION,
-    MAX_HOUR,
-    MAX_SHIFT_MINUTES,
-    MIN_DURATION,
-    MIN_HOUR,
-)
+from walkie.policy import window_rules
 from walkie.weather import weather_line
 
 SYSTEM_PROMPT = (
@@ -19,11 +13,10 @@ SYSTEM_PROMPT = (
     'Schema: {"window_start":"HH:MM","duration_minutes":N,'
     '"location_type":"shade|sun|any","intensity":"relaxed|moderate|brisk",'
     '"reason":"one sentence why","route_notes":"one short routing tip"}. '
-    f"Rules: window_start within {MIN_HOUR:02d}:00-{MAX_HOUR:02d}:00; "
-    f"duration {MIN_DURATION}-{MAX_DURATION} min; "
-    "rain chance over 30% -> location_type shade; prefer a start inside "
-    f"daylight hours; shift at most {MAX_SHIFT_MINUTES} min from the "
-    "preferred time."
+    "Rules: rain chance over 30% -> location_type shade; prefer a start "
+    "inside daylight hours; the user message states the exact time window "
+    "and duration range you must stay inside — obey it, and when it says "
+    "keep a value exactly, do not change it."
 )
 
 
@@ -55,6 +48,7 @@ def build_user_prompt(
         f"{base_plan.intensity.value} intensity{area}. "
         f"Weather: {weather_line(weather)}. "
         f"Daylight: {_daylight_line(daylight)}. "
+        f"Allowed: {window_rules(preferred_time, preferred_duration)}. "
         f"Proposal on the table: {preferred_time} "
         f"({proposal.reason if proposal else 'none yet'})."
     )
