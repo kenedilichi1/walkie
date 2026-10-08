@@ -1,0 +1,14 @@
+{
+  "suggested_time": "18:30",
+  "duration_minutes": 60,
+  "location_type": "any",
+  "intensity": "relaxed",
+  "area": "",
+  "weather_summary": "overcast, 25.6C (high 29.0C), rain chance 100%, wind 8.9 km/h",
+  "weather_fingerprint": "overcast|25C|high",
+  "reason": "To avoid the heavy rain, I've planned the walk 1 hour and 30 minutes before the expected rain start time.",
+  "route_notes": "Choose a route with minimal tree cover to avoid getting soaked.",
+  "created_at": "2026-10-08T20:23:22",
+  "approve_by": "2026-10-08T18:30",
+  "for_date": "2026-10-08"
+}

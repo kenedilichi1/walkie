@@ -1,0 +1,18 @@
+{
+  "for_date": "2026-10-08",
+  "window_start": "18:00",
+  "window_end": "19:30",
+  "duration_minutes": 90,
+  "location_type": "shade",
+  "intensity": "relaxed",
+  "area": "",
+  "sunrise": "06:14",
+  "sunset": "18:15",
+  "daylight_minutes": 720,
+  "weather_summary": "overcast, 25.6C (high 29.0C), rain chance 100%, wind 8.9 km/h",
+  "weather_fingerprint": "overcast|25C|high",
+  "reason": "Avoiding heavy rain, planning the walk 1.5 hours before the expected rain start time.",
+  "route_notes": "Start the walk before the rain sets in, and try to find a shaded route.",
+  "source": "llm",
+  "created_at": "2026-10-08T20:23:25"
+}
