@@ -31,12 +31,23 @@ def reminder_message(proposal: Proposal) -> str:
     )
 
 
+def read_todays_walk(
+    today_path: Path, now: datetime | None = None
+) -> TodayPlan | None:
+    """Today's approved walk; a leftover file from an earlier day is none."""
+    now = now or clock.now()
+    record = read_record(today_path, TodayPlan.from_dict)
+    if record is None or record.for_date != clock.today_iso(now):
+        return None
+    return record
+
+
 def _today_walk(
     now: datetime, proposal_path: Path, today_path: Path
 ) -> tuple[Proposal, datetime] | None:
     """Today's pending walk (proposal, target time); None when nothing to do."""
-    if today_path.exists():
-        return None  # already approved or edited
+    if read_todays_walk(today_path, now) is not None:
+        return None  # today's walk is already approved or edited
     proposal = read_record(proposal_path, Proposal.from_dict)
     if proposal is None or proposal.for_date != clock.today_iso(now):
         return None  # never act on a missing or stale (yesterday's) proposal
@@ -120,7 +131,9 @@ def run_daemon(check_interval: float = 30.0) -> None:
     try:
         while True:
             actions = check_reminders()
-            if "auto-approved" in actions or config.TODAY_PLAN_PATH.exists():
+            if "auto-approved" in actions or (
+                read_todays_walk(config.TODAY_PLAN_PATH) is not None
+            ):
                 log.info("Walk approved for today; daemon exiting.")
                 return
             time.sleep(check_interval)

@@ -22,7 +22,12 @@ from walkie.media.voice import Synth, build_walk_audio
 from walkie.models import UserPlan, Weather
 from walkie.routing.builder import build_route, resolve_walk_window
 from walkie.suggest.proposals import LlmFn, ensure_proposal
-from walkie.suggest.reminders import NotifyFn, check_reminders, load_weather
+from walkie.suggest.reminders import (
+    NotifyFn,
+    check_reminders,
+    load_weather,
+    read_todays_walk,
+)
 
 log = get_logger("pipeline")
 
@@ -97,7 +102,9 @@ def run(
         )
     )
 
-    if paths.today.exists():
+    # Date-aware: a leftover today_plan.json from an earlier day does not
+    # count as approval, so route/voice keep waiting for today's decision.
+    if read_todays_walk(paths.today, now) is not None:
         pbf = settings.pbf
         if pbf is None:
             raise config.ConfigError(
