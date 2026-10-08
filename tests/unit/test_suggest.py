@@ -10,19 +10,53 @@ from walkie.suggest import proposals, reminders
 def test_parse_llm_json_valid():
     text = 'Here you go: {"suggested_time":"17:00","duration_minutes":45,'
     text += '"reason":"rain coming","route_notes":"stay near trees"} ok'
-    result = proposals.parse_llm_json(text)
+    plan = UserPlan(preferred_time="16:30", duration_minutes=30)
+    result = proposals.parse_llm_json(text, plan)
     assert result["suggested_time"] == "17:00"
     assert result["duration_minutes"] == 45
 
 
 def test_parse_llm_json_rejects_garbage():
-    assert proposals.parse_llm_json("no json here") is None
-    assert proposals.parse_llm_json('{"suggested_time":"25:99"}') is None
+    plan = UserPlan(preferred_time="16:30", duration_minutes=30)
+    assert proposals.parse_llm_json("no json here", plan) is None
+    assert proposals.parse_llm_json('{"suggested_time":"25:99"}', plan) is None
     assert proposals.parse_llm_json(
-        '{"suggested_time":"03:00","duration_minutes":30}'
+        '{"suggested_time":"03:00","duration_minutes":30}', plan
     ) is None
     assert proposals.parse_llm_json(
-        '{"suggested_time":"12:00","duration_minutes":999}'
+        '{"suggested_time":"12:00","duration_minutes":999}', plan
+    ) is None
+
+
+def test_parse_llm_json_rejects_drift_outside_window():
+    """The model may nudge 16:30 by 60 min, not redefine it."""
+    plan = UserPlan(preferred_time="16:30", duration_minutes=30)
+    # 18:30 is 2 h after 16:30 — outside the ±60 min window
+    assert proposals.parse_llm_json(
+        '{"suggested_time":"18:30","duration_minutes":30}', plan
+    ) is None
+    # 17:30 is exactly the edge — allowed
+    assert proposals.parse_llm_json(
+        '{"suggested_time":"17:30","duration_minutes":30}', plan
+    )
+
+
+def test_parse_llm_json_keeps_out_of_window_user_choice():
+    """A 22:30 / 240 min user plan is untouchable: echo it or nothing."""
+    plan = UserPlan(preferred_time="22:30", duration_minutes=240)
+    # echoing the user's own values is allowed even outside the standing window
+    assert proposals.parse_llm_json(
+        '{"suggested_time":"22:30","duration_minutes":240}', plan
+    )
+    # changing them is not
+    assert proposals.parse_llm_json(
+        '{"suggested_time":"18:30","duration_minutes":60}', plan
+    ) is None
+    assert proposals.parse_llm_json(
+        '{"suggested_time":"22:30","duration_minutes":60}', plan
+    ) is None
+    assert proposals.parse_llm_json(
+        '{"suggested_time":"18:30","duration_minutes":240}', plan
     ) is None
 
 
@@ -304,3 +338,40 @@ def test_ensure_proposal_ignores_unusable_llm_reply(tmp_path):
     assert proposal.suggested_time == "16:30"  # fell back, no crash
     assert proposal.duration_minutes == 30
     assert "base plan" in proposal.reason
+
+
+def test_ensure_proposal_rejects_drift_outside_window(tmp_path):
+    """A model that ignores the shift limit gets dropped, not obeyed."""
+    proposal_path = tmp_path / "proposal.json"
+    plan = UserPlan(preferred_time="16:30", duration_minutes=30)
+    drift = {"suggested_time": "18:30", "duration_minutes": 30,
+             "reason": "felt like evening"}
+
+    proposal = proposals.ensure_proposal(
+        plan,
+        None,
+        now=datetime.fromisoformat("2026-10-07T09:00"),
+        proposal_path=proposal_path,
+        llm_fn=lambda prompt: drift,
+    )
+    assert proposal.suggested_time == "16:30"
+    assert "base plan" in proposal.reason
+
+
+def test_ensure_proposal_echoes_out_of_window_user_choice(tmp_path):
+    """A model that correctly echoes 22:30 / 240 keeps its reason."""
+    proposal_path = tmp_path / "proposal.json"
+    plan = UserPlan(preferred_time="22:30", duration_minutes=240)
+    echo = {"suggested_time": "22:30", "duration_minutes": 240,
+            "reason": "late walk, keep it"}
+
+    proposal = proposals.ensure_proposal(
+        plan,
+        None,
+        now=datetime.fromisoformat("2026-10-08T10:00"),
+        proposal_path=proposal_path,
+        llm_fn=lambda prompt: echo,
+    )
+    assert proposal.suggested_time == "22:30"
+    assert proposal.duration_minutes == 240
+    assert proposal.reason == "late walk, keep it"
