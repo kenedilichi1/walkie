@@ -117,3 +117,122 @@ def test_resolve_location_manual_requires_name():
         region._resolve_location(args)
     args.name = "Kenya"
     assert region._resolve_location(args) == (1.0, 2.0, "Kenya", "", "UTC")
+
+
+_SETTINGS_TEMPLATE = (
+    "# walkie settings\n"
+    "region:\n"
+    "  name: Nigeria\n"
+    "  pbf: data/osm/nigeria-latest.osm.pbf\n"
+    "location:\n"
+    "  lat: 6.0\n"
+    "  lon: 8.0\n"
+    "  timezone: Africa/Lagos\n"
+    "ollama:\n"
+    "  model: llama3.2:3b\n"
+)
+
+
+def test_set_location_updates_coords_and_preserves_everything_else(tmp_path):
+    settings = tmp_path / "settings.yaml"
+    settings.write_text(_SETTINGS_TEMPLATE)
+    region.set_location(6.31625, -0.5, settings_path=settings)
+    text = settings.read_text()
+    assert "# walkie settings" in text
+    assert "lat: 6.31625" in text
+    assert "lon: -0.5" in text
+    assert "timezone: Africa/Lagos" in text  # untouched when tz not given
+    assert "pbf: data/osm/nigeria-latest.osm.pbf" in text
+    assert "model: llama3.2:3b" in text
+
+
+def test_set_location_writes_timezone_when_given(tmp_path):
+    settings = tmp_path / "settings.yaml"
+    settings.write_text(_SETTINGS_TEMPLATE)
+    region.set_location(6.31625, 8.11691, tz="Africa/Accra",
+                        settings_path=settings)
+    text = settings.read_text()
+    assert "lat: 6.31625" in text
+    assert "timezone: Africa/Accra" in text
+
+
+def test_set_location_rejects_bad_points(tmp_path):
+    settings = tmp_path / "settings.yaml"
+    settings.write_text(_SETTINGS_TEMPLATE)
+    with pytest.raises(region.RegionError, match="out of range"):
+        region.set_location(91.0, 0.0, settings_path=settings)
+    with pytest.raises(region.RegionError, match="0, 0"):
+        region.set_location(0.0, 0.0, settings_path=settings)
+
+
+def test_set_location_missing_settings_file(tmp_path):
+    with pytest.raises(region.RegionError, match="not found"):
+        region.set_location(6.0, 8.0, settings_path=tmp_path / "nope.yaml")
+
+
+class _Response:
+    def __init__(self, payload):
+        self._payload = payload
+
+    def raise_for_status(self):
+        pass
+
+    def json(self):
+        return self._payload
+
+
+def test_geocode_place_returns_first_hit(monkeypatch):
+    def fake_get(url, **kwargs):
+        assert "nominatim" in url
+        return _Response(
+            [{"lat": "6.31625", "lon": "8.11691", "display_name": "Riverside"}]
+        )
+
+    monkeypatch.setattr(region.requests, "get", fake_get)
+    assert region.geocode_place("Riverside, Calabar") == (
+        6.31625, 8.11691, "Riverside",
+    )
+
+
+def test_geocode_place_none_when_offline(monkeypatch):
+    def boom(*args, **kwargs):
+        raise region.requests.RequestException("offline")
+
+    monkeypatch.setattr(region.requests, "get", boom)
+    assert region.geocode_place("Riverside") is None
+
+
+def test_geocode_place_blank_query_skips_network(monkeypatch):
+    def boom(*args, **kwargs):
+        raise AssertionError("network touched")
+
+    monkeypatch.setattr(region.requests, "get", boom)
+    assert region.geocode_place("   ") is None
+
+
+def test_geocode_place_rejects_out_of_range_hit(monkeypatch):
+    monkeypatch.setattr(
+        region.requests, "get",
+        lambda *a, **k: _Response([{"lat": "999", "lon": "8.1"}]),
+    )
+    assert region.geocode_place("Somewhere") is None
+
+
+def test_resolve_link_follows_short_link(monkeypatch):
+    class _Redirect:
+        url = "https://www.google.com/maps/place/X/@6.31625,8.11691,17z"
+
+    monkeypatch.setattr(region.requests, "get", lambda *a, **k: _Redirect())
+    assert region.resolve_link("https://maps.app.goo.gl/abc") == (6.31625, 8.11691)
+
+
+def test_resolve_link_ignores_non_http():
+    assert region.resolve_link("maps.app.goo.gl/abc") is None
+
+
+def test_resolve_link_none_when_offline(monkeypatch):
+    def boom(*args, **kwargs):
+        raise region.requests.RequestException("offline")
+
+    monkeypatch.setattr(region.requests, "get", boom)
+    assert region.resolve_link("https://maps.app.goo.gl/abc") is None

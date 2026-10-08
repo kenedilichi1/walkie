@@ -3,12 +3,14 @@
 One-time setup step: finds the most specific .pbf extract Geofabrik offers
 for where you are (sub-region like a state when available, else country),
 downloads it into data/osm/, and writes region + coordinates + timezone
-into config/settings.yaml.
+into config/settings.yaml. The wizard's start-point screen reuses the
+location helpers here: IP detection, forward geocoding, share-link resolve.
 """
 
 from __future__ import annotations
 
 import argparse
+import math
 import re
 import sys
 from collections.abc import Callable
@@ -17,7 +19,7 @@ from typing import Any
 
 import requests
 
-from walkie import config
+from walkie import config, geo
 from walkie.log import get_logger
 
 log = get_logger("region")
@@ -240,6 +242,25 @@ def _replace_setting_line(
     return f"{indent}{key_name}: {rendered}"
 
 
+def _apply_replacements(
+    settings_path: Path,
+    replacements: dict[tuple[str, str], str],
+) -> None:
+    """Rewrite the given (section, key) lines of settings.yaml, keep the rest."""
+    section: str | None = None
+    out: list[str] = []
+    for line in settings_path.read_text().splitlines():
+        # the regex only matches unindented lines, so these are section keys
+        top_level_key = re.match(r"^([A-Za-z_][\w-]*):\s*(.*)$", line)
+        if top_level_key:
+            section = top_level_key.group(1)
+        out.append(_replace_setting_line(line, section, replacements))
+    if replacements:
+        log.warning(f"keys not found in settings.yaml: {sorted(replacements)}")
+    settings_path.write_text("\n".join(out) + "\n")
+    log.info(f"Updated {settings_path}")
+
+
 def update_settings(
     pbf_rel: str,
     region_name: str,
@@ -256,18 +277,81 @@ def update_settings(
         ("location", "lon"): _format_coordinate(lon),
         ("location", "timezone"): tz,
     }
-    section: str | None = None
-    out: list[str] = []
-    for line in settings_path.read_text().splitlines():
-        # the regex only matches unindented lines, so these are section keys
-        top_level_key = re.match(r"^([A-Za-z_][\w-]*):\s*(.*)$", line)
-        if top_level_key:
-            section = top_level_key.group(1)
-        out.append(_replace_setting_line(line, section, replacements))
-    if replacements:
-        log.warning(f"keys not found in settings.yaml: {sorted(replacements)}")
-    settings_path.write_text("\n".join(out) + "\n")
-    log.info(f"Updated {settings_path}")
+    _apply_replacements(settings_path, replacements)
+
+
+def set_location(
+    lat: float,
+    lon: float,
+    tz: str | None = None,
+    settings_path: Path = config.SETTINGS_PATH,
+) -> None:
+    """Write the walk start point into config/settings.yaml.
+
+    Region name and .pbf path stay untouched: changing where walks start
+    must not silently re-point the map extract. Timezone is written only
+    when the caller is sure (IP detection), never clobbered with UTC.
+    """
+    if not (-90.0 <= lat <= 90.0) or not (-180.0 <= lon <= 180.0):
+        raise RegionError(f"location out of range (lat={lat}, lon={lon})")
+    if math.hypot(lat, lon) < 1e-9:
+        raise RegionError("location is (0, 0) — that is not a real start point")
+    if not settings_path.exists():
+        raise RegionError(f"{settings_path} not found; set region manually")
+    replacements: dict[tuple[str, str], str] = {
+        ("location", "lat"): _format_coordinate(lat),
+        ("location", "lon"): _format_coordinate(lon),
+    }
+    if tz:
+        replacements[("location", "timezone")] = tz
+    _apply_replacements(settings_path, replacements)
+
+
+def geocode_place(query: str) -> tuple[float, float, str] | None:
+    """Forward geocode an address or landmark; None when offline or unknown."""
+    if not query.strip():
+        return None
+    try:
+        params: dict[str, str | int] = {"format": "jsonv2", "q": query, "limit": 1}
+        r = requests.get(
+            "https://nominatim.openstreetmap.org/search",
+            params=params,
+            headers=UA,
+            timeout=10,
+        )
+        r.raise_for_status()
+        hits = r.json()
+        if not hits:
+            return None
+        point = _point_or_none(float(hits[0]["lat"]), float(hits[0]["lon"]))
+        if point is None:
+            return None
+        name = str(hits[0].get("display_name") or query)
+        log.info(f"Geocoded {query!r}: {point[0]}, {point[1]} ({name})")
+        return (point[0], point[1], name)
+    except Exception as exc:  # noqa: BLE001 - offline must not break setup
+        log.info(f"  geocode failed: {exc}")
+        return None
+
+
+def resolve_link(url: str) -> tuple[float, float] | None:
+    """Follow a short link (maps.app.goo.gl & friends) to its coordinates."""
+    if not url.startswith(("http://", "https://")):
+        return None
+    try:
+        r = requests.get(url, headers=UA, timeout=10, allow_redirects=True)
+        return geo.parse_map_link(r.url)
+    except Exception as exc:  # noqa: BLE001 - offline must not break setup
+        log.info(f"  link resolve failed: {exc}")
+        return None
+
+
+def _point_or_none(lat: float, lon: float) -> tuple[float, float] | None:
+    if not (-90.0 <= lat <= 90.0) or not (-180.0 <= lon <= 180.0):
+        return None
+    if math.hypot(lat, lon) < 1e-9:
+        return None
+    return (lat, lon)
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
