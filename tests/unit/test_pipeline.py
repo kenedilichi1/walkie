@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from pathlib import Path
 
 import gpxpy
@@ -93,6 +93,23 @@ def test_run_with_approval_builds_route_and_voice(tmp_path):
     span = (points[-1].time - points[0].time).total_seconds()
     assert span == pytest.approx(11 * 60, abs=1)  # window from today_plan.json
     assert (tmp_path / "audio" / "walk_audio.mp3").stat().st_size > 0
+
+
+def test_run_waits_for_approval_despite_yesterdays_file(tmp_path):
+    """A leftover approval from yesterday must not unlock route/voice."""
+    pbf = write_grid_pbf(tmp_path / "grid.osm.pbf")
+    write_json(
+        tmp_path / "today_plan.json",
+        {
+            "for_date": (date.today() - timedelta(days=1)).isoformat(),
+            "suggested_time": "16:30",
+            "duration_minutes": 11,
+        },
+    )
+    morning = datetime.combine(date.today(), time(9, 0))
+    actions = _run(tmp_path, pbf, today=False, now=morning)
+    assert "route/voice: waiting for approval" in actions
+    assert not (tmp_path / "routes" / "walk.gpx").exists()
 
 
 def test_run_skips_fresh_outputs_then_force_rebuilds(tmp_path):

@@ -1,5 +1,7 @@
 from datetime import datetime
+from types import SimpleNamespace
 
+from walkie import config
 from walkie.models import Proposal, UserPlan, Weather
 from walkie.storage import read_json, write_json
 from walkie.suggest import proposals, reminders
@@ -46,6 +48,12 @@ def _proposal(when="16:30", for_date="2026-10-07"):
         "for_date": for_date,
         "weather_fingerprint": "unavailable",
     }
+
+
+def _approved(for_date, when="16:30"):
+    return Proposal.from_dict(_proposal(when, for_date=for_date)).approve(
+        f"{for_date}T15:00", approved_by="auto"
+    )
 
 
 def test_check_reminders_fires_at_30_15_5_then_auto_approves(tmp_path):
@@ -97,6 +105,91 @@ def test_check_reminders_ignores_proposal_from_yesterday(tmp_path):
     )
     assert actions == []
     assert not today_path.exists()
+
+
+def test_read_todays_walk_only_returns_todays_approval(tmp_path):
+    path = tmp_path / "today_plan.json"
+    now = datetime.fromisoformat("2026-10-07T12:00")
+    assert reminders.read_todays_walk(path, now) is None  # missing file
+    write_json(path, _approved("2026-10-06").to_dict())
+    assert reminders.read_todays_walk(path, now) is None  # yesterday's leftover
+    write_json(path, _approved("2026-10-07").to_dict())
+    record = reminders.read_todays_walk(path, now)
+    assert record is not None
+    assert record.approved_by == "auto"
+
+
+def test_check_reminders_approves_past_yesterdays_leftover(tmp_path):
+    """A leftover approval from yesterday must not block today's reminders."""
+    proposal_path = tmp_path / "proposal.json"
+    today_path = tmp_path / "today_plan.json"
+    state_path = tmp_path / "state.json"
+    write_json(proposal_path, _proposal("16:30"))
+    write_json(today_path, _approved("2026-10-06").to_dict())
+    notify = lambda title, message: None  # noqa: E731
+    paths = {
+        "proposal_path": proposal_path,
+        "today_path": today_path,
+        "state_path": state_path,
+    }
+
+    day = "2026-10-07"
+    assert reminders.check_reminders(
+        datetime.fromisoformat(f"{day}T16:00"), notify, **paths
+    ) == ["reminder-30"]
+    actions = reminders.check_reminders(
+        datetime.fromisoformat(f"{day}T16:31"), notify, **paths
+    )
+    assert "auto-approved" in actions
+    today = read_json(today_path)
+    assert today["for_date"] == "2026-10-07"  # replaced with today's approval
+    assert today["approved_by"] == "auto"
+
+
+def test_check_reminders_silent_when_todays_approval_exists(tmp_path):
+    """Today's own approval still means: nothing left to remind or approve."""
+    proposal_path = tmp_path / "proposal.json"
+    today_path = tmp_path / "today_plan.json"
+    state_path = tmp_path / "state.json"
+    write_json(proposal_path, _proposal("16:30"))
+    write_json(today_path, _approved("2026-10-07").to_dict())
+    notify = lambda title, message: None  # noqa: E731
+
+    actions = reminders.check_reminders(
+        datetime.fromisoformat("2026-10-07T16:31"),
+        notify,
+        proposal_path=proposal_path,
+        today_path=today_path,
+        state_path=state_path,
+    )
+    assert actions == []
+    assert read_json(today_path)["for_date"] == "2026-10-07"  # untouched
+
+
+def test_run_daemon_keeps_running_despite_yesterdays_file(tmp_path, monkeypatch):
+    """A leftover file must not make the daemon quit before today's walk."""
+    stale = tmp_path / "today_plan.json"
+    write_json(stale, _approved("2026-10-06").to_dict())
+    checks: list[int] = []
+    slept: list[int] = []
+
+    def boom(_seconds):
+        slept.append(1)
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(config, "TODAY_PLAN_PATH", stale)
+    monkeypatch.setattr(config, "load_settings", lambda: object())
+    monkeypatch.setattr(config, "load_user_plan", lambda: UserPlan())
+    monkeypatch.setattr(reminders, "refresh_from_settings", lambda settings: None)
+    monkeypatch.setattr(reminders, "ensure_proposal", lambda base, weather: None)
+    monkeypatch.setattr(
+        reminders, "check_reminders", lambda: checks.append(1) or []
+    )
+    monkeypatch.setattr(reminders, "time", SimpleNamespace(sleep=boom))
+
+    reminders.run_daemon()
+    assert checks, "daemon never reached its loop"
+    assert slept, "daemon quit on yesterday's file instead of waiting"
 
 
 def test_write_today_plan_records_edit(tmp_path):

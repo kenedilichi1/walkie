@@ -112,10 +112,8 @@ def cmd_region(args: argparse.Namespace) -> None:
 
 
 def cmd_suggest(args: argparse.Namespace) -> None:
-    from walkie.models import TodayPlan
-    from walkie.storage import read_record
     from walkie.suggest.proposals import ensure_proposal
-    from walkie.suggest.reminders import load_weather
+    from walkie.suggest.reminders import load_weather, read_todays_walk
 
     base_plan = config.load_user_plan()
     weather = load_weather()
@@ -124,13 +122,13 @@ def cmd_suggest(args: argparse.Namespace) -> None:
         from walkie.ui.adjust_dialog import open_adjust_dialog
 
         proposal = ensure_proposal(base_plan, weather)
-        existing = read_record(config.TODAY_PLAN_PATH, TodayPlan.from_dict)
+        existing = read_todays_walk(config.TODAY_PLAN_PATH)
         if open_adjust_dialog(proposal, existing):
             log.info("Edited plan saved to output/today_plan.json")
         return
 
     proposal = ensure_proposal(base_plan, weather, force=args.force_new)
-    if config.TODAY_PLAN_PATH.exists():
+    if read_todays_walk(config.TODAY_PLAN_PATH) is not None:
         log.info("Today's walk is already approved — see output/today_plan.json")
     else:
         log.info(
