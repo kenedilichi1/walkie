@@ -4,7 +4,7 @@ from PyQt6.QtCore import QTime
 from PyQt6.QtWidgets import QSpinBox, QTimeEdit
 
 from walkie import clock
-from walkie.policy import DEFAULT_HHMM, MAX_DURATION, MIN_DURATION
+from walkie.policy import DEFAULT_HHMM, USER_MAX_DURATION, USER_MIN_DURATION
 
 
 def make_time_edit(value: str) -> QTimeEdit:
@@ -16,7 +16,7 @@ def make_time_edit(value: str) -> QTimeEdit:
 
 
 def make_duration_spin(
-    value: int, low: int = MIN_DURATION, high: int = MAX_DURATION
+    value: int, low: int = USER_MIN_DURATION, high: int = USER_MAX_DURATION
 ) -> QSpinBox:
     spin = QSpinBox()
     spin.setRange(low, high)

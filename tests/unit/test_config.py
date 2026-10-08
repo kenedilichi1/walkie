@@ -115,9 +115,18 @@ def test_load_user_plan_rejects_unusable_time(tmp_path):
 
 def test_load_user_plan_rejects_out_of_range_duration(tmp_path):
     path = tmp_path / "user_plan.json"
-    path.write_text('{"preferred_time": "16:30", "duration_minutes": 500}')
+    path.write_text('{"preferred_time": "16:30", "duration_minutes": 481}')
     with pytest.raises(ConfigError, match="duration_minutes"):
         config.load_user_plan(path)
+
+
+def test_load_user_plan_accepts_any_time_and_long_duration(tmp_path):
+    """User scope: any clock time, duration up to the typo-guard ceiling."""
+    path = tmp_path / "user_plan.json"
+    path.write_text('{"preferred_time": "22:30", "duration_minutes": 480}')
+    plan = config.load_user_plan(path)
+    assert plan.preferred_time == "22:30"
+    assert plan.duration_minutes == 480
 
 
 def test_voice_model_defaults_when_section_missing(tmp_path):

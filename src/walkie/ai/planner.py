@@ -107,7 +107,7 @@ def make_plan(
     preferred_duration = (
         proposal.duration_minutes if proposal else base_plan.duration_minutes
     )
-    base_duration = policy.coerce_duration(preferred_duration)
+    base_duration = policy.coerce_user_duration(preferred_duration)
     duration = policy.coerce_duration(llm.get("duration_minutes"), base_duration)
 
     fallback_location = (
