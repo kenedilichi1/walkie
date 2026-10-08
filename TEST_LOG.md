@@ -4,6 +4,11 @@ Fill this in during and after each field walk. `docs/test_protocol.md` row 10
 signs off from section E. Commands assume the project venv
 (`.venv/bin/walkie …` or the `make` alias).
 
+Before/after evidence: `docs/evidence/2026-10-08-drift/` holds the archived
+input → proposal → plan from the run where the user's 21:30 / 30 min became
+18:00–19:30 / 90 min. Regenerate the "after" side once
+`fix/single-decision-plan` lands.
+
 ## A. Pre-walk checklist (home, online)
 
 - [ ] `make run` — proposal + plan + route + voice built, exit 0
