@@ -109,6 +109,20 @@ def test_make_plan_prefers_proposal_window_when_llm_fails():
     assert plan.duration_minutes == 60
 
 
+def test_make_plan_keeps_user_time_and_duration_outside_model_range():
+    """A 22:30 / 240 min user plan is legal even though the model can't say it."""
+    plan = planner.make_plan(
+        UserPlan(preferred_time="22:30", duration_minutes=240),
+        None,
+        DAYLIGHT,
+        None,
+        None,
+        NOW,
+    )
+    assert plan.window_start == "22:30"
+    assert plan.duration_minutes == 240
+
+
 def test_ensure_plan_reuses_regenerates_and_forces(tmp_path):
     plan_path = tmp_path / "plan.json"
     calls = []

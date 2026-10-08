@@ -1,6 +1,7 @@
 from walkie import config, region
 from walkie.models import Intensity, LocationType, UserPlan
 from walkie.ui.app import ensure_app
+from walkie.ui.widgets import make_duration_spin
 from walkie.ui.wizard import (
     PlanWizard,
     StartPointPage,
@@ -38,6 +39,14 @@ def test_wizard_defaults_when_created_fresh():
     assert plan.preferred_time == "12:30"
     assert plan.duration_minutes == 30
     assert plan.location_type is LocationType.SHADE
+
+
+def test_duration_spin_accepts_long_user_walks():
+    """User scope: the wizard must not cap walks at the model's 180 min."""
+    spin = make_duration_spin(240)
+    assert spin.value() == 240
+    spin.setValue(480)
+    assert spin.value() == 480
 
 
 def test_save_and_load_plan(tmp_path):

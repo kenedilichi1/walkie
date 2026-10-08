@@ -158,10 +158,14 @@ def load_user_plan(path: Path = USER_PLAN_PATH) -> UserPlan:
             f"{path}: preferred_time {plan.preferred_time!r} is not HH:MM — "
             "run: walkie wizard"
         )
-    if not policy.MIN_DURATION <= plan.duration_minutes <= policy.MAX_DURATION:
+    if not (
+        policy.USER_MIN_DURATION
+        <= plan.duration_minutes
+        <= policy.USER_MAX_DURATION
+    ):
         raise ConfigError(
             f"{path}: duration_minutes {plan.duration_minutes} outside "
-            f"{policy.MIN_DURATION}-{policy.MAX_DURATION} min — "
+            f"{policy.USER_MIN_DURATION}-{policy.USER_MAX_DURATION} min — "
             "run: walkie wizard"
         )
     return plan

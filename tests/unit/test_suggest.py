@@ -38,6 +38,16 @@ def test_make_proposal_falls_back_without_llm():
     assert proposal.for_date == "2026-10-07"
 
 
+def test_make_proposal_keeps_user_evening_time_and_long_duration():
+    """User choices sit outside the model window but must survive fallback."""
+    plan = UserPlan(preferred_time="22:30", duration_minutes=240)
+    proposal = proposals.make_proposal(
+        plan, None, None, now=datetime.fromisoformat("2026-10-08T20:00")
+    )
+    assert proposal.suggested_time == "22:30"
+    assert proposal.duration_minutes == 240
+
+
 def _proposal(when="16:30", for_date="2026-10-07"):
     return {
         "suggested_time": when,

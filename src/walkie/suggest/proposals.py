@@ -62,7 +62,7 @@ def make_proposal(
         )
         parsed = policy.DEFAULT_HHMM
     hour, minute = parsed
-    base_duration = policy.coerce_duration(base_plan.duration_minutes)
+    base_duration = policy.coerce_user_duration(base_plan.duration_minutes)
     duration = policy.coerce_duration(llm.get("duration_minutes"), base_duration)
     reason = llm.get("reason") or (
         "Kept your base plan (model reply wasn't usable)."
