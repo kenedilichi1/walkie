@@ -196,9 +196,10 @@ class StartPointPage(QWizardPage):
             if point is None and text:
                 point = region.resolve_link(text)
             if point is None:
+                shown = text if len(text) <= 60 else f"{text[:57]}…"
                 self.status_label.setText(
-                    "No coordinates found — long-press a spot in your maps "
-                    "app and copy the coordinates instead."
+                    f"No coordinates found in {shown!r} — long-press a spot "
+                    "in your maps app and copy the coordinates instead."
                 )
                 return False
             self._chosen = point

@@ -39,6 +39,16 @@ GOOD = (6.31625, 8.11691)
         ("https://www.google.com/maps/place/Riverside", None),
         ("https://www.google.com/maps/place/Trees?query=lagos", None),
         ("https://www.google.com/maps/place/Trees/@4.0,7.2?query=lagos", (4.0, 7.2)),
+        # real-world paste noise: invisible chars, unicode commas, degree marks
+        ("\u200b6.31625, 8.11691\u200b", GOOD),
+        ("\ufeff6.31625, 8.11691", GOOD),
+        ("\u20666.31625, 8.11691\u2069", GOOD),
+        ("6.31625，8.11691", GOOD),
+        ("6.31625،8.11691", GOOD),
+        ("6.31625°, 8.11691°", GOOD),
+        ("6.31625° N, 8.11691° E", GOOD),
+        ("6.31625 S, 8.11691 W", (-6.31625, -8.11691)),
+        ("6.31625\u00a0, 8.11691\u202f", GOOD),
     ],
 )
 def test_parse_place(text, expected):

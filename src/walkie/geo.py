@@ -7,13 +7,16 @@ import re
 from urllib.parse import parse_qs, unquote, urlparse
 
 _COORD_RE = re.compile(
-    r"^\s*(-?\d{1,2}(?:\.\d+)?)\s*[,;\s]\s*(-?\d{1,3}(?:\.\d+)?)\s*$"
+    r"^\s*(-?\d{1,2}(?:\.\d+)?)\s*([NnSs])?\s*[,;\s]\s*"
+    r"(-?\d{1,3}(?:\.\d+)?)\s*([EeWw])?\s*$"
 )
 _AT_RE = re.compile(r"@(-?\d{1,2}\.\d+),(-?\d{1,3}\.\d+)")
 _OSM_FRAGMENT_RE = re.compile(
     r"^map=\d+(?:\.\d+)?/(-?\d{1,2}(?:\.\d+)?)/(-?\d{1,3}(?:\.\d+)?)"
 )
 _PAIR_KEYS = (("lat", "lon"), ("mlat", "mlon"))
+_INVISIBLE_RE = re.compile("[\u00ad\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufeff]")
+_SPACE_RE = re.compile("[\u00a0\u1680\u2000-\u200a\u202f\u205f\u3000]")
 
 
 def haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -34,12 +37,30 @@ def _point(lat: float, lon: float) -> tuple[float, float] | None:
     return (lat, lon)
 
 
+def _clean(text: str) -> str:
+    """Strip what keyboards, apps and maps sneak into a copied coordinate."""
+    text = _INVISIBLE_RE.sub("", text)
+    text = _SPACE_RE.sub(" ", text)
+    text = text.replace("，", ",").replace("،", ",").replace("°", "")
+    return text.strip()
+
+
 def parse_coords(text: str) -> tuple[float, float] | None:
-    """'6.31625, 8.11691' -> (6.31625, 8.11691); None unless it is one."""
-    match = _COORD_RE.fullmatch(text)
+    """'6.31625, 8.11691' -> (6.31625, 8.11691); None unless it is one.
+
+    Tolerates the noise real pastes carry: zero-width characters, unicode
+    spaces, fullwidth/Arabic commas, degree signs, and N/S/E/W suffixes.
+    """
+    match = _COORD_RE.fullmatch(_clean(text))
     if not match:
         return None
-    return _point(float(match.group(1)), float(match.group(2)))
+    lat = float(match.group(1))
+    lon = float(match.group(3))
+    if (match.group(2) or "N").upper() == "S":
+        lat = -lat
+    if (match.group(4) or "E").upper() == "W":
+        lon = -lon
+    return _point(lat, lon)
 
 
 def _query_point(query: dict[str, list[str]]) -> tuple[float, float] | None:
@@ -61,7 +82,7 @@ def _query_point(query: dict[str, list[str]]) -> tuple[float, float] | None:
 
 def parse_map_link(url: str) -> tuple[float, float] | None:
     """Coordinates carried by a Google Maps / OSM / OsmAnd / geo: link."""
-    text = url.strip()
+    text = _clean(url)
     if text.startswith("geo:"):
         body = text[len("geo:"):]
         if "?" in body:

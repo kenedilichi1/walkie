@@ -192,3 +192,12 @@ def test_saved_point_none_when_settings_unreadable(monkeypatch):
 
     monkeypatch.setattr(config, "load_settings", boom)
     assert saved_point() is None
+
+
+def test_start_page_paste_tolerates_invisible_noise():
+    wizard = PlanWizard(guess=None)
+    page = wizard.start_page
+    page.paste_edit.setText("\u200b5.35251, 7.08292\u200b")
+    assert page.validatePage() is True
+    assert wizard.start_point() == (5.35251, 7.08292)
+    assert "5.35251" in page.status_label.text()
