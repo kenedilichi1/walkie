@@ -297,3 +297,13 @@ class Plan:
         data["location_type"] = self.location_type.value
         data["intensity"] = self.intensity.value
         return data
+
+    def planned_by(self, preferred_time: str) -> str:
+        """Who set the walk time: "you" or "the model".
+
+        Kept your base plan, or the model echoed your exact time back ->
+        "you". The model actually moved the time -> "the model".
+        """
+        if self.source != self.SOURCE_LLM:
+            return "you"
+        return "the model" if self.window_start != preferred_time else "you"

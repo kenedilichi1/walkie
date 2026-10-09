@@ -193,6 +193,20 @@ def test_plan_from_dict_defaults_on_missing_or_bad_values():
     assert plan.sunrise is None
 
 
+def test_planned_by_labels_you_or_the_model():
+    # kept the base plan (model reply wasn't usable) -> you
+    kept = Plan(window_start="16:30", source=Plan.SOURCE_FALLBACK)
+    assert kept.planned_by("16:30") == "you"
+
+    # the model echoed your exact time back -> still your choice
+    echoed = Plan(window_start="16:30", source=Plan.SOURCE_LLM)
+    assert echoed.planned_by("16:30") == "you"
+
+    # the model actually moved the time -> the model
+    moved = Plan(window_start="17:00", source=Plan.SOURCE_LLM)
+    assert moved.planned_by("16:30") == "the model"
+
+
 def test_daylight_roundtrip_and_partial():
     day = Daylight(for_date="2026-10-07", sunrise="06:14", sunset="18:15",
                    daylight_minutes=721)
