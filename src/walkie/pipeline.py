@@ -145,6 +145,7 @@ def run(
                 out_path=paths.audio,
                 voice_model=settings.voice_model,
                 synth=synth,
+                plan=plan,
             )
             actions.append("voice: rebuilt")
         else:
