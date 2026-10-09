@@ -30,6 +30,54 @@ def test_with_quote_caps_body_length():
     assert len(body) <= notify.MAX_BODY
 
 
+def _capture_run(monkeypatch, platform: str):
+    """Record the argv send_notification shells out to, per platform."""
+    calls: list[list[str]] = []
+
+    def fake_run(argv, **_kwargs):
+        calls.append(list(argv))
+
+    monkeypatch.setattr(notify.subprocess, "run", fake_run)
+    monkeypatch.setattr(notify.sys, "platform", platform)
+    return calls
+
+
+def test_macos_notification_uses_osascript(monkeypatch):
+    calls = _capture_run(monkeypatch, "darwin")
+    notify.send_notification("Walk soon", "30 min at 16:30.")
+    assert calls and calls[0][0] == "osascript"
+    assert "display notification" in calls[0][2]
+
+
+def test_linux_notification_uses_notify_send(monkeypatch):
+    calls = _capture_run(monkeypatch, "linux")
+    notify.send_notification("Walk soon", "30 min at 16:30.")
+    assert calls and calls[0][0] == "notify-send"
+    assert "Walk soon" in calls[0]
+
+
+def test_macos_script_escapes_quotes_and_backslashes():
+    script = notify._macos_script('He said "go"', "back\\slash")
+    assert '\\"go\\"' in script
+    assert "back\\\\slash" in script
+
+
+def test_unknown_platform_logs_without_crashing(monkeypatch, caplog):
+    calls = _capture_run(monkeypatch, "win32")
+    notify.send_notification("Walk soon", "30 min at 16:30.")
+    assert calls == []  # nothing shelled out
+
+
+def test_handler_failure_is_swallowed(monkeypatch):
+    _capture_run(monkeypatch, "darwin")
+
+    def boom(*_args, **_kwargs):
+        raise RuntimeError("no desktop")
+
+    monkeypatch.setattr(notify.subprocess, "run", boom)
+    notify.send_notification("Walk soon", "30 min at 16:30.")  # must not raise
+
+
 def _proposal(when: str = "16:30", for_date: str = "2026-10-07") -> dict:
     return {
         "suggested_time": when,
