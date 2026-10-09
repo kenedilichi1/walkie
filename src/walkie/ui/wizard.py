@@ -330,11 +330,24 @@ def run_setup() -> None:
     else:
         save_start_point(point, detected)
         log.info(f"Start point set to {point[0]:.5f}, {point[1]:.5f}")
+    first_walk = _first_walk_line(record)
     QMessageBox.information(
         None,
         "You're set!",
-        f"Plan saved to {config.USER_PLAN_PATH.name}.\n"
-        "Today's walk will update on the next run.\n\n"
+        f"Plan saved to {config.USER_PLAN_PATH.name}.\n\n"
+        f"{first_walk}\n\n"
         f"“{record.quote}”",
     )
     log.info(f"Saved plan to {config.USER_PLAN_PATH}")
+
+
+def _first_walk_line(record: UserPlan) -> str:
+    """Build today's first walk now; a friendly line if that fails."""
+    from walkie.autoschedule import build_first_walk, summarize
+
+    try:
+        return summarize(build_first_walk(record))
+    except config.ConfigError as exc:
+        # No location/weather/model yet — not a hard setup failure.
+        log.info(f"First walk not built yet: {exc}")
+        return "Today's walk will build on your next run."

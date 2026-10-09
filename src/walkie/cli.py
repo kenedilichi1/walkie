@@ -13,6 +13,7 @@
     walkie history [--limit N]        look back at past days' plans
     walkie card [--gpx PATH]          build a shareable walk card
     walkie qr [--url URL] [--port N]  print a QR that opens the sync page
+    walkie schedule [--time ...]      view or change your walk schedule
 """
 
 from __future__ import annotations
@@ -128,6 +129,25 @@ def build_parser() -> argparse.ArgumentParser:
     qr_parser.add_argument(
         "--port", type=int, default=8000,
         help="port shown in the guessed URL (default: 8000)",
+    )
+
+    sched_parser = sub.add_parser(
+        "schedule", help="view or change your standing walk schedule"
+    )
+    sched_parser.add_argument(
+        "--time", help="preferred start time as HH:MM (e.g. 16:30)"
+    )
+    sched_parser.add_argument(
+        "--duration", type=int, help="walk length in minutes"
+    )
+    sched_parser.add_argument(
+        "--location", help="shade | sun | any"
+    )
+    sched_parser.add_argument(
+        "--intensity", help="relaxed | moderate | brisk"
+    )
+    sched_parser.add_argument(
+        "--area", help="area or landmark label (optional)"
     )
     return parser
 
@@ -278,6 +298,31 @@ def cmd_qr(args: argparse.Namespace) -> None:
     log.info(f"Scan to open: {url}")
 
 
+def cmd_schedule(args: argparse.Namespace) -> None:
+    from walkie import schedule
+
+    changed = any(
+        value is not None
+        for value in (args.time, args.duration, args.location,
+                      args.intensity, args.area)
+    )
+    if not changed:
+        log.info(f"Your schedule: {schedule.describe(schedule.load_current())}")
+        log.info("Change it with: walkie schedule --time 16:30 --duration 45")
+        return
+    updated = schedule.apply_overrides(
+        schedule.load_current(),
+        time=args.time,
+        duration=args.duration,
+        location=args.location,
+        intensity=args.intensity,
+        area=args.area,
+    )
+    record = schedule.save(updated)
+    log.info(f"Saved schedule: {schedule.describe(record)}")
+    log.info("Today's walk will rebuild around it on the next run.")
+
+
 HANDLERS: dict[str, Callable[[argparse.Namespace], None]] = {
     "wizard": cmd_wizard,
     "region": cmd_region,
@@ -292,6 +337,7 @@ HANDLERS: dict[str, Callable[[argparse.Namespace], None]] = {
     "history": cmd_history,
     "card": cmd_card,
     "qr": cmd_qr,
+    "schedule": cmd_schedule,
 }
 
 
