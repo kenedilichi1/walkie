@@ -2,7 +2,8 @@
 
 The input the user set, and what `make run` produced that evening. Archived
 before the next run overwrote `output/`. This is the "before" sample for the
-`fix/single-decision-plan` branch and the side-by-side in the DEV post.
+`fix/single-decision-plan` branch and the side-by-side in the DEV post. The
+fixed replay of this exact scenario lives in [`after/`](after/).
 
 | File | What it is | Time | Length |
 | --- | --- | --- | --- |

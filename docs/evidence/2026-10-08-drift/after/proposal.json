@@ -1,0 +1,15 @@
+{
+  "suggested_time": "21:30",
+  "duration_minutes": 30,
+  "location_type": "any",
+  "intensity": "relaxed",
+  "area": "",
+  "weather_summary": "weather unavailable (offline)",
+  "weather_fingerprint": "unavailable",
+  "reason": "Kept your base plan (model reply wasn't usable).",
+  "route_notes": "",
+  "created_at": "2026-10-08T20:23:00",
+  "approve_by": "2026-10-08T21:30",
+  "for_date": "2026-10-08",
+  "base_fingerprint": "21:30|30|any|relaxed|"
+}

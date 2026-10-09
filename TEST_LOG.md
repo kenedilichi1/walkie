@@ -6,8 +6,9 @@ signs off from section E. Commands assume the project venv
 
 Before/after evidence: `docs/evidence/2026-10-08-drift/` holds the archived
 input → proposal → plan from the run where the user's 21:30 / 30 min became
-18:00–19:30 / 90 min. Regenerate the "after" side once
-`fix/single-decision-plan` lands.
+18:00–19:30 / 90 min. The `after/` subfolder replays that same input and the
+same drifted model replies after the validators landed — the replies are now
+rejected and the walk stays at 21:30 / 30 min.
 
 ## A. Pre-walk checklist (home, online)
 
