@@ -10,6 +10,7 @@
     walkie daemon                     loop reminder checks until approved
     walkie run [--force]              full pipeline (cron entry point)
     walkie serve [--port N]           serve today's files to your phone (LAN)
+    walkie history [--limit N]        look back at past days' plans
 """
 
 from __future__ import annotations
@@ -97,6 +98,14 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument(
         "--force", action="store_true",
         help="regenerate proposal, plan, route and voice even if fresh",
+    )
+
+    history_parser = sub.add_parser(
+        "history", help="look back at past days' plans"
+    )
+    history_parser.add_argument(
+        "--limit", type=int, default=30,
+        help="how many past days to show (default: 30)",
     )
     return parser
 
@@ -211,6 +220,20 @@ def cmd_run(args: argparse.Namespace) -> None:
         log.info(action)
 
 
+def cmd_history(args: argparse.Namespace) -> None:
+    from walkie.history import load_history
+
+    plans = load_history(limit=args.limit)
+    if not plans:
+        log.info("No past plans yet — they build up as new days arrive.")
+        return
+    for plan in plans:
+        log.info(
+            f"{plan.for_date}  {plan.window_start}-{plan.window_end}  "
+            f"{plan.duration_minutes} min  {plan.location_type.value}"
+        )
+
+
 HANDLERS: dict[str, Callable[[argparse.Namespace], None]] = {
     "wizard": cmd_wizard,
     "region": cmd_region,
@@ -222,6 +245,7 @@ HANDLERS: dict[str, Callable[[argparse.Namespace], None]] = {
     "daemon": cmd_daemon,
     "serve": cmd_serve,
     "run": cmd_run,
+    "history": cmd_history,
 }
 
 

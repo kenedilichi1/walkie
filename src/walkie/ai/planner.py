@@ -14,6 +14,7 @@ from typing import Any, TypeVar
 
 from walkie import clock, config, policy
 from walkie.ai.prompt import SYSTEM_PROMPT, build_user_prompt
+from walkie.history import archive_plan
 from walkie.llm import complete, extract_json
 from walkie.log import get_logger
 from walkie.models import (
@@ -199,6 +200,9 @@ def ensure_plan(
     if existing and not force and plan_is_valid(existing, base_plan, weather, now):
         log.info("Reusing today's plan.")
         return existing
+    # A new day's plan supersedes yesterday's — keep the old one in history.
+    if existing is not None and existing.for_date != clock.today_iso(now):
+        archive_plan(existing, plan_path)
     preferred_time = proposal.suggested_time if proposal else base_plan.preferred_time
     preferred_duration = (
         proposal.duration_minutes if proposal else base_plan.duration_minutes
