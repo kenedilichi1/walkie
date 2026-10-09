@@ -17,7 +17,6 @@ dependencies = [
     "osmium",
     "piper-tts",
     "imageio-ffmpeg",
-    "plyer",
     "pyyaml",
     "PyQt6",
     "segno",
