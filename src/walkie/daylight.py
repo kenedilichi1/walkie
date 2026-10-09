@@ -16,6 +16,35 @@ from walkie import clock
 from walkie.models import Daylight
 
 
+def _minutes(hhmm: str) -> int | None:
+    parsed = clock.parse_hhmm(hhmm)
+    return parsed[0] * 60 + parsed[1] if parsed else None
+
+
+def daylight_advisory(
+    window_start: str, window_end: str, daylight: Daylight
+) -> str:
+    """Warn when a walk window falls outside daylight; "" when it fits.
+
+    A window that crosses midnight (end <= start) counts as ending after
+    sunset. Missing sunrise/sunset (polar night, no data) yields no warning
+    rather than a guess.
+    """
+    if not daylight.sunrise or not daylight.sunset:
+        return ""
+    start, end = _minutes(window_start), _minutes(window_end)
+    rise, set_ = _minutes(daylight.sunrise), _minutes(daylight.sunset)
+    if start is None or end is None or rise is None or set_ is None:
+        return ""
+    crossed_midnight = end <= start
+    notes = []
+    if start < rise:
+        notes.append(f"starts before sunrise ({daylight.sunrise})")
+    if crossed_midnight or end > set_:
+        notes.append(f"ends after sunset ({daylight.sunset})")
+    return "; ".join(notes)
+
+
 def daylight_for(
     lat: float,
     lon: float,
