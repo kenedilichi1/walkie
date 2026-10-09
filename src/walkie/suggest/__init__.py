@@ -9,7 +9,6 @@ from walkie.suggest.proposals import (
 from walkie.suggest.reminders import (
     check_reminders,
     refresh_stale_approval,
-    run_daemon,
     write_today_plan,
 )
 
@@ -20,6 +19,5 @@ __all__ = [
     "parse_llm_json",
     "proposal_is_valid",
     "refresh_stale_approval",
-    "run_daemon",
     "write_today_plan",
 ]

@@ -1,19 +1,19 @@
 """walkie command line — the only module that parses argv and exits.
 
-    walkie wizard                     one-time setup wizard
-    walkie region [--dry-run ...]     detect location, fetch OSM extract
-    walkie suggest [--edit|--force]   build today's walk proposal
-    walkie plan [--force-new]         build today's plan (decision engine)
-    walkie route [--minutes N]        build today's walking loop -> walk.gpx
-    walkie voice [--gpx PATH]         narrate route turns -> walk_audio.mp3
-    walkie remind                     fire due reminders once
-    walkie daemon                     loop reminder checks until approved
-    walkie run [--force]              full pipeline (cron entry point)
-    walkie serve [--port N]           serve today's files to your phone (LAN)
-    walkie history [--limit N]        look back at past days' plans
-    walkie card [--gpx PATH]          build a shareable walk card
-    walkie qr [--url URL] [--port N]  print a QR that opens the sync page
-    walkie schedule [--time ...]      view or change your walk schedule
+walkie wizard                     one-time setup wizard
+walkie region [--dry-run ...]     detect location, fetch OSM extract
+walkie suggest [--edit|--force]   build today's walk proposal
+walkie plan [--force-new]         build today's plan (decision engine)
+walkie route [--minutes N]        build today's walking loop -> walk.gpx
+walkie voice [--gpx PATH]         narrate route turns -> walk_audio.mp3
+walkie remind                     fire due reminders once
+walkie daemon [--stop]             background service: keeps today's walk current
+walkie run [--force]              full pipeline (cron entry point)
+walkie serve [--port N]           serve today's files to your phone (LAN)
+walkie history [--limit N]        look back at past days' plans
+walkie card [--gpx PATH]          build a shareable walk card
+walkie qr [--url URL] [--port N]  print a QR that opens the sync page
+walkie schedule [--time ...]      view or change your walk schedule
 """
 
 from __future__ import annotations
@@ -45,37 +45,62 @@ def build_parser() -> argparse.ArgumentParser:
     )
     region.add_arguments(region_parser)
 
-    suggest_parser = sub.add_parser(
-        "suggest", help="build today's walk proposal"
-    )
+    suggest_parser = sub.add_parser("suggest", help="build today's walk proposal")
     suggest_parser.add_argument(
         "--edit", action="store_true", help="open the quick-adjust dialog"
     )
     suggest_parser.add_argument(
-        "--force-new", action="store_true",
+        "--force-new",
+        action="store_true",
         help="regenerate the proposal even if still valid",
     )
 
-    plan_parser = sub.add_parser(
-        "plan", help="build today's plan (AI decision engine)"
-    )
+    plan_parser = sub.add_parser("plan", help="build today's plan (AI decision engine)")
     plan_parser.add_argument(
-        "--force-new", action="store_true",
+        "--force-new",
+        action="store_true",
         help="regenerate the plan even if still valid",
     )
 
     sub.add_parser("remind", help="fire due reminders once, then exit")
-    sub.add_parser("daemon", help="loop reminder checks until approved")
+
+    daemon_parser = sub.add_parser(
+        "daemon",
+        help="background service: keeps today's walk current until stopped",
+    )
+    daemon_parser.add_argument(
+        "--stop",
+        action="store_true",
+        help="stop a running daemon",
+    )
+    daemon_parser.add_argument(
+        "--install",
+        action="store_true",
+        help="set up launchd to start the daemon automatically at login",
+    )
+    daemon_parser.add_argument(
+        "--uninstall",
+        action="store_true",
+        help="remove the launchd agent and clean up",
+    )
+    daemon_parser.add_argument(
+        "--interval",
+        type=float,
+        default=30.0,
+        help="seconds between pipeline passes (default: 30)",
+    )
 
     route_parser = sub.add_parser(
         "route", help="build today's walking loop -> output/routes/walk.gpx"
     )
     route_parser.add_argument(
-        "--minutes", type=int,
+        "--minutes",
+        type=int,
         help="loop duration in minutes (default: today's plan)",
     )
     route_parser.add_argument(
-        "--refresh", action="store_true",
+        "--refresh",
+        action="store_true",
         help="re-scan the OSM extract (ignore the street-graph cache)",
     )
 
@@ -83,7 +108,9 @@ def build_parser() -> argparse.ArgumentParser:
         "voice", help="narrate route turns -> output/audio/walk_audio.mp3"
     )
     voice_parser.add_argument(
-        "--gpx", type=Path, default=config.DEFAULT_WALK_GPX,
+        "--gpx",
+        type=Path,
+        default=config.DEFAULT_WALK_GPX,
         help="GPX track to narrate (default: output/routes/walk.gpx)",
     )
 
@@ -91,11 +118,14 @@ def build_parser() -> argparse.ArgumentParser:
         "serve", help="LAN server: phone downloads today's files"
     )
     serve_parser.add_argument(
-        "--port", type=int, default=8000,
+        "--port",
+        type=int,
+        default=8000,
         help="port to listen on (default: 8000)",
     )
     serve_parser.add_argument(
-        "--no-window", action="store_true",
+        "--no-window",
+        action="store_true",
         help="serve in the terminal only (no PyQt window)",
     )
 
@@ -103,15 +133,16 @@ def build_parser() -> argparse.ArgumentParser:
         "run", help="full pipeline: suggest -> plan -> remind -> route -> voice"
     )
     run_parser.add_argument(
-        "--force", action="store_true",
+        "--force",
+        action="store_true",
         help="regenerate proposal, plan, route and voice even if fresh",
     )
 
-    history_parser = sub.add_parser(
-        "history", help="look back at past days' plans"
-    )
+    history_parser = sub.add_parser("history", help="look back at past days' plans")
     history_parser.add_argument(
-        "--limit", type=int, default=30,
+        "--limit",
+        type=int,
+        default=30,
         help="how many past days to show (default: 30)",
     )
 
@@ -119,7 +150,9 @@ def build_parser() -> argparse.ArgumentParser:
         "card", help="build a shareable card of today's walk -> output/card.html"
     )
     card_parser.add_argument(
-        "--gpx", type=Path, default=config.DEFAULT_WALK_GPX,
+        "--gpx",
+        type=Path,
+        default=config.DEFAULT_WALK_GPX,
         help="route to measure for the card (default: output/routes/walk.gpx)",
     )
 
@@ -131,7 +164,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="URL to encode (default: guess from today's settings)",
     )
     qr_parser.add_argument(
-        "--port", type=int, default=8000,
+        "--port",
+        type=int,
+        default=8000,
         help="port shown in the guessed URL (default: 8000)",
     )
 
@@ -141,18 +176,10 @@ def build_parser() -> argparse.ArgumentParser:
     sched_parser.add_argument(
         "--time", help="preferred start time as HH:MM (e.g. 16:30)"
     )
-    sched_parser.add_argument(
-        "--duration", type=int, help="walk length in minutes"
-    )
-    sched_parser.add_argument(
-        "--location", help="shade | sun | any"
-    )
-    sched_parser.add_argument(
-        "--intensity", help="relaxed | moderate | brisk"
-    )
-    sched_parser.add_argument(
-        "--area", help="area or landmark label (optional)"
-    )
+    sched_parser.add_argument("--duration", type=int, help="walk length in minutes")
+    sched_parser.add_argument("--location", help="shade | sun | any")
+    sched_parser.add_argument("--intensity", help="relaxed | moderate | brisk")
+    sched_parser.add_argument("--area", help="area or landmark label (optional)")
     return parser
 
 
@@ -212,9 +239,7 @@ def cmd_plan(args: argparse.Namespace) -> None:
         if candidate is not None and candidate.for_date == clock.today_iso()
         else None
     )
-    ensure_plan(
-        base_plan, weather, daylight, proposal, force=args.force_new
-    )
+    ensure_plan(base_plan, weather, daylight, proposal, force=args.force_new)
 
 
 def cmd_route(args: argparse.Namespace) -> None:
@@ -251,9 +276,18 @@ def cmd_remind(args: argparse.Namespace) -> None:
 
 
 def cmd_daemon(args: argparse.Namespace) -> None:
-    from walkie.suggest.reminders import run_daemon
+    from walkie.daemon import install_daemon, run_daemon, stop_daemon, uninstall_daemon
 
-    run_daemon()
+    if args.install:
+        install_daemon(interval=args.interval)
+        return
+    if args.uninstall:
+        uninstall_daemon()
+        return
+    if args.stop:
+        stop_daemon()
+        return
+    run_daemon(check_interval=args.interval)
 
 
 def cmd_serve(args: argparse.Namespace) -> None:
@@ -315,8 +349,13 @@ def cmd_schedule(args: argparse.Namespace) -> None:
 
     changed = any(
         value is not None
-        for value in (args.time, args.duration, args.location,
-                      args.intensity, args.area)
+        for value in (
+            args.time,
+            args.duration,
+            args.location,
+            args.intensity,
+            args.area,
+        )
     )
     if not changed:
         log.info(f"Your schedule: {schedule.describe(schedule.load_current())}")
@@ -359,8 +398,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         HANDLERS[args.command](args)
-    except (config.ConfigError, region.RegionError, VoiceError, RouteError,
-            SyncError) as exc:
+    except (
+        config.ConfigError,
+        region.RegionError,
+        VoiceError,
+        RouteError,
+        SyncError,
+    ) as exc:
         log.error(f"error: {exc}")
         return 1
     except KeyboardInterrupt:

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import time
 from collections.abc import Callable
 from dataclasses import replace
 from datetime import datetime, timedelta
@@ -13,7 +12,6 @@ from walkie import clock, config
 from walkie.log import get_logger
 from walkie.models import Proposal, TodayPlan, UserPlan, Weather
 from walkie.storage import read_json, read_record, write_json
-from walkie.suggest.proposals import ensure_proposal
 from walkie.sync.notify import send_notification, with_quote
 from walkie.weather import refresh_from_settings
 
@@ -150,25 +148,6 @@ def write_today_plan(
 def load_weather() -> Weather | None:
     settings = config.load_settings()
     return refresh_from_settings(settings)
-
-
-def run_daemon(check_interval: float = 30.0) -> None:
-    """Loop reminder checks until today's walk is approved or edited."""
-    settings = config.load_settings()
-    base_plan = config.load_user_plan()
-    weather = refresh_from_settings(settings)
-    ensure_proposal(base_plan, weather)
-    try:
-        while True:
-            actions = check_reminders()
-            if "auto-approved" in actions or (
-                read_todays_walk(config.TODAY_PLAN_PATH) is not None
-            ):
-                log.info("Walk approved for today; daemon exiting.")
-                return
-            time.sleep(check_interval)
-    except KeyboardInterrupt:
-        log.info("Daemon stopped.")
 
 
 def load_base_plan() -> UserPlan:
