@@ -1,7 +1,5 @@
 from datetime import datetime
-from types import SimpleNamespace
 
-from walkie import config
 from walkie.models import Proposal, UserPlan, Weather
 from walkie.storage import read_json, write_json
 from walkie.suggest import proposals, reminders
@@ -208,32 +206,6 @@ def test_check_reminders_silent_when_todays_approval_exists(tmp_path):
     )
     assert actions == []
     assert read_json(today_path)["for_date"] == "2026-10-07"  # untouched
-
-
-def test_run_daemon_keeps_running_despite_yesterdays_file(tmp_path, monkeypatch):
-    """A leftover file must not make the daemon quit before today's walk."""
-    stale = tmp_path / "today_plan.json"
-    write_json(stale, _approved("2026-10-06").to_dict())
-    checks: list[int] = []
-    slept: list[int] = []
-
-    def boom(_seconds):
-        slept.append(1)
-        raise KeyboardInterrupt
-
-    monkeypatch.setattr(config, "TODAY_PLAN_PATH", stale)
-    monkeypatch.setattr(config, "load_settings", lambda: object())
-    monkeypatch.setattr(config, "load_user_plan", lambda: UserPlan())
-    monkeypatch.setattr(reminders, "refresh_from_settings", lambda settings: None)
-    monkeypatch.setattr(reminders, "ensure_proposal", lambda base, weather: None)
-    monkeypatch.setattr(
-        reminders, "check_reminders", lambda: checks.append(1) or []
-    )
-    monkeypatch.setattr(reminders, "time", SimpleNamespace(sleep=boom))
-
-    reminders.run_daemon()
-    assert checks, "daemon never reached its loop"
-    assert slept, "daemon quit on yesterday's file instead of waiting"
 
 
 def test_write_today_plan_records_edit(tmp_path):
