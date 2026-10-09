@@ -108,6 +108,25 @@ def test_run_flags_walk_after_sunset(tmp_path):
     assert advisory and "after sunset" in advisory[0]
 
 
+def test_run_labels_who_planned_the_time(tmp_path):
+    """The plan line says who set the time: you, or the model."""
+    pbf = write_grid_pbf(tmp_path / "grid.osm.pbf")
+
+    # model echoes your exact time -> "you"
+    echo = _run(tmp_path, pbf, today=False,
+                llm_fn=lambda _p: {"window_start": "16:30",
+                                   "duration_minutes": 30})
+    assert any("planned by you" in a for a in echo
+               if a.startswith("plan "))
+
+    # model moves the time -> "the model"
+    moved = _run(tmp_path, pbf, today=False, force=True,
+                 llm_fn=lambda _p: {"window_start": "17:00",
+                                    "duration_minutes": 30})
+    assert any("planned by the model" in a for a in moved
+               if a.startswith("plan "))
+
+
 def test_run_no_advisory_for_daylight_walk(tmp_path):
     """A mid-day walk (well within sunrise/sunset) gets no advisory."""
     pbf = write_grid_pbf(tmp_path / "grid.osm.pbf")

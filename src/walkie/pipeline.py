@@ -88,7 +88,9 @@ def run(
         base_plan, weather, daylight, proposal, now, force, paths.plan, llm_fn
     )
     actions.append(
-        f"plan {plan.window_start}-{plan.window_end} ({plan.duration_minutes} min)"
+        f"plan {plan.window_start}-{plan.window_end} "
+        f"({plan.duration_minutes} min, planned by "
+        f"{plan.planned_by(base_plan.preferred_time)})"
     )
 
     advisory = daylight_advisory(plan.window_start, plan.window_end, daylight)
