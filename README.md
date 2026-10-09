@@ -69,11 +69,12 @@ make run      # plan today's walk, build the route and the audio
 make serve    # share today's files with your phone over WiFi
 ```
 
-`make serve` prints an address like `http://192.168.1.20:8000/`. Open it on
-your phone to download:
+`make serve` prints an address like `http://192.168.1.20:8000/` and a QR
+code — scan it with your phone camera to open the page. You can download:
 
 - `walk.gpx`: the route. Open it in OsmAnd.
 - `walk_audio.mp3`: the spoken turn cues.
+- `card.html`: a shareable card of today's walk (screenshot to share).
 - `today_plan.json`: today's walk time and the reason for it.
 
 **Run it automatically.** Add this line to your crontab (`crontab -e`) and
@@ -83,6 +84,10 @@ only rebuilds what has changed, so running it every minute is cheap.
 ```bash
 * * * * * cd /path/to/walkie && .venv/bin/walkie run >> output/cron.log 2>&1
 ```
+
+**Change your schedule anytime.** `walkie schedule --time 16:30 --duration 45`
+updates when and how long you walk; today's walk rebuilds around it on the
+next run.
 
 ## Commands
 
@@ -102,6 +107,10 @@ you can also type `walkie <command>` directly.
 | `make remind` | Send any reminder that's due, then exit |
 | `make daemon` | Keep sending reminders until today's walk is approved |
 | `make serve` | Share today's files with your phone (`--port N` to change the port) |
+| `make history` | Look back at past days' plans (`--limit N` to change how many) |
+| `make card` | Build a shareable card of today's walk (`output/card.html`) |
+| `make qr` | Print a QR code that opens the sync page on your phone |
+| `make schedule` | View or change your walk schedule (e.g. `walkie schedule --time 16:30 --duration 45`) |
 
 ## Configuration
 
@@ -139,7 +148,11 @@ walkie/
 │   ├── ai/        the AI planner
 │   ├── routing/   builds the walking loop from the map
 │   ├── media/     turns the route into spoken cues
-│   ├── sync/      notifications and the phone server
+│   ├── sync/      notifications, the phone server and the QR code
+│   ├── card.py    the shareable walk card
+│   ├── schedule.py view/change your walk schedule from the CLI
+│   ├── autoschedule.py plan your first walk during setup
+│   ├── history.py keeps past days' plans
 │   └── ui/        the setup wizard and the adjust dialog
 ├── tests/
 └── docs/          how it's built and how it's tested
@@ -156,3 +169,7 @@ make typecheck   # mypy --strict
 - [docs/build_logic.md](docs/build_logic.md): how the steps connect
 - [docs/test_protocol.md](docs/test_protocol.md): the test plan for each step
 - [TEST_LOG.md](TEST_LOG.md): the field-testing log
+
+## License
+
+MIT — see [LICENSE](LICENSE).
