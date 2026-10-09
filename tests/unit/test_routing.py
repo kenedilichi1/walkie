@@ -235,7 +235,7 @@ def test_voice_narrates_route_gpx(tmp_path):
         out_path=tmp_path / "walk_audio.mp3",
         synth=lambda text: (AudioSpec(22050, 2, 1), b"\x01\x00" * 1000),
     )
-    assert audio.cues == 5
+    assert audio.cues == 8
     assert audio.loop_seconds == pytest.approx(660, abs=1)
 
 

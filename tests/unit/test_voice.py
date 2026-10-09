@@ -13,8 +13,11 @@ import pytest
 
 from walkie import config
 from walkie.media.voice import (
+    MIN_CUE_GAP_SECONDS,
     AudioSpec,
+    Turn,
     VoiceError,
+    Walk,
     briefing_text,
     build_walk_audio,
     encode_mp3,
@@ -79,11 +82,49 @@ def test_left_turn_detected(tmp_path):
 def test_plan_cues_cover_start_turns_and_finish():
     walk = parse_walk(FIXTURE)
     cues = plan_cues(walk)
-    assert len(cues) == 5
+    # start + (approach + turn) x3 + finish
+    assert len(cues) == 8
     assert cues[0].at_seconds == 0.0 and "Start" in cues[0].text
-    assert [c.text for c in cues[1:-1]] == ["Turn right"] * 3
     assert cues[-1].at_seconds == walk.loop_seconds
     assert "arrived" in cues[-1].text
+    # the turn cues themselves still fire at each corner
+    turn_texts = [c.text for c in cues if c.text == "Turn right"]
+    assert turn_texts == ["Turn right"] * 3
+
+
+def test_plan_cues_warn_before_each_turn():
+    """An approach cue fires ~15 s ahead of every corner."""
+    walk = parse_walk(FIXTURE)
+    cues = plan_cues(walk)
+    approaches = [c for c in cues if c.text.endswith("ahead")]
+    assert [c.text for c in approaches] == ["Turn right ahead"] * 3
+    # each approach sits 15 s before its corner (75/150/225)
+    assert [c.at_seconds for c in approaches] == pytest.approx([60.0, 135.0, 210.0])
+    # and never collides with the previous cue
+    for prev, curr in zip(cues, cues[1:], strict=False):
+        assert curr.at_seconds - prev.at_seconds >= MIN_CUE_GAP_SECONDS
+
+
+def test_plan_cues_skip_approach_when_corner_is_too_close():
+    """A corner right after the previous cue gets no approach — just the turn."""
+    tight = Walk(
+        turns=(
+            Turn("Turn left", 8.0, 10.0),
+            Turn("Turn right", 40.0, 50.0),
+        ),
+        loop_seconds=60.0,
+        total_meters=60.0,
+    )
+    cues = plan_cues(tight)
+    texts = [c.text for c in cues]
+    # first corner at 8 s: approach would be at -7 s (before start) -> skipped
+    assert texts == [
+        "Start of your walk. Follow the route.",
+        "Turn left",
+        "Turn right ahead",
+        "Turn right",
+        "You have arrived. Walk complete.",
+    ]
 
 
 def test_briefing_text_is_rich_and_sparse_is_short():
@@ -126,7 +167,7 @@ def test_build_walk_audio_speaks_the_plan_briefing(tmp_path):
                 location_type=LocationType.SHADE, intensity=Intensity.MODERATE)
     result = build_walk_audio(FIXTURE, out_path=out, synth=stub_synth, plan=plan)
     assert out.exists()
-    assert result.cues == 5  # opening briefing + 3 turns + finish
+    assert result.cues == 8  # opening + 3 approach + 3 turns + finish
 
 
 def test_render_covers_loop_time_and_places_cues():
@@ -177,7 +218,7 @@ def test_build_walk_audio_end_to_end_stub(tmp_path):
     out = tmp_path / "walk_audio.mp3"
     result = build_walk_audio(FIXTURE, out_path=out, synth=stub_synth)
     assert out.exists() and out.stat().st_size > 0
-    assert result.cues == 5
+    assert result.cues == 8
     assert result.loop_seconds == pytest.approx(300, abs=0.5)
     assert not out.with_suffix(".wav").exists()  # intermediate cleaned up
     # spec test: playback covers loop time — probed from the real mp3
@@ -252,5 +293,5 @@ def test_live_piper_covers_loop_time(tmp_path):
     out = tmp_path / "live.mp3"
     model = config.ROOT / "data/voices/en_US-lessac-medium.onnx"
     result = build_walk_audio(FIXTURE, out_path=out, voice_model=model)
-    assert result.cues == 5
+    assert result.cues == 8
     assert probe_duration(out) == pytest.approx(300, abs=3)
