@@ -42,6 +42,36 @@ def read_todays_walk(
     return record
 
 
+def refresh_stale_approval(
+    base_plan: UserPlan,
+    proposal: Proposal,
+    now: datetime | None = None,
+    today_path: Path = config.TODAY_PLAN_PATH,
+) -> TodayPlan | None:
+    """Replace today's approval when the standing schedule changed.
+
+    The approval is a cache of the walk decision. When you change your
+    schedule in the wizard, an already-approved (or edited) walk was built
+    from the old preference, so it is rebuilt from the fresh proposal. An
+    approval whose fingerprint still matches — or a walk approved for a
+    weather reason — is left untouched. Returns the new record, or None
+    when nothing changed.
+    """
+    now = now or clock.now()
+    record = read_todays_walk(today_path, now)
+    if record is None or record.base_fingerprint == base_plan.fingerprint():
+        return None
+    updated = proposal.approve(
+        now.isoformat(timespec="seconds"), approved_by="auto"
+    )
+    write_json(today_path, updated.to_dict())
+    log.info(
+        f"Schedule changed; today's walk is now "
+        f"{updated.suggested_time} ({updated.duration_minutes} min)."
+    )
+    return updated
+
+
 def _today_walk(
     now: datetime, proposal_path: Path, today_path: Path
 ) -> tuple[Proposal, datetime] | None:

@@ -27,6 +27,7 @@ from walkie.suggest.reminders import (
     check_reminders,
     load_weather,
     read_todays_walk,
+    refresh_stale_approval,
 )
 
 log = get_logger("pipeline")
@@ -89,6 +90,10 @@ def run(
     actions.append(
         f"plan {plan.window_start}-{plan.window_end} ({plan.duration_minutes} min)"
     )
+
+    # A schedule change replaces today's approval so route/voice follow.
+    if refresh_stale_approval(base_plan, proposal, now, paths.today):
+        actions.append("approval: refreshed for new schedule")
 
     # Reminders before the branch: auto-approve at walk time creates
     # today_plan.json, so route/voice build in this same pass.

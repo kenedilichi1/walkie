@@ -252,6 +252,77 @@ def test_write_today_plan_records_edit(tmp_path):
     assert read_json(today_path)["duration_minutes"] == 45
 
 
+def _approved_with_fp(base_plan, when="16:30", for_date="2026-10-07"):
+    data = _proposal(when, for_date=for_date)
+    data["base_fingerprint"] = base_plan.fingerprint()
+    return Proposal.from_dict(data).approve(
+        f"{for_date}T15:00", approved_by="auto"
+    )
+
+
+def test_refresh_stale_approval_replaces_when_schedule_changed(tmp_path):
+    """An approval built from an old schedule is rebuilt from the proposal."""
+    from dataclasses import replace
+
+    today_path = tmp_path / "today_plan.json"
+    old = UserPlan(preferred_time="16:30", duration_minutes=30)
+    new = UserPlan(preferred_time="09:00", duration_minutes=45)
+    write_json(today_path, _approved_with_fp(old).to_dict())
+
+    proposal = replace(
+        Proposal.from_dict(_proposal("09:00")),
+        base_fingerprint=new.fingerprint(),
+        duration_minutes=45,
+    )
+    now = datetime.fromisoformat("2026-10-07T10:00")
+    updated = reminders.refresh_stale_approval(
+        new, proposal, now=now, today_path=today_path
+    )
+    assert updated is not None
+    assert updated.suggested_time == "09:00"
+    assert updated.duration_minutes == 45
+    assert updated.base_fingerprint == new.fingerprint()
+    assert read_json(today_path)["suggested_time"] == "09:00"
+
+
+def test_refresh_stale_approval_leaves_matching_schedule(tmp_path):
+    """Same schedule -> the approval (even an edit) is left untouched."""
+    today_path = tmp_path / "today_plan.json"
+    base = UserPlan(preferred_time="16:30", duration_minutes=30)
+    # an edited approval: 17:15/45, but from the same standing schedule
+    reminders.write_today_plan(
+        Proposal.from_dict(
+            {**_proposal(), "base_fingerprint": base.fingerprint()}
+        ),
+        "17:15",
+        45,
+        approved_by="edit",
+        now=datetime.fromisoformat("2026-10-07T15:00"),
+        today_path=today_path,
+    )
+    now = datetime.fromisoformat("2026-10-07T16:00")
+    proposal = Proposal.from_dict(_proposal("16:30"))
+    result = reminders.refresh_stale_approval(
+        base, proposal, now=now, today_path=today_path
+    )
+    assert result is None  # no change
+    assert read_json(today_path)["suggested_time"] == "17:15"  # edit kept
+    assert read_json(today_path)["duration_minutes"] == 45
+
+
+def test_refresh_stale_approval_noop_without_approval(tmp_path):
+    today_path = tmp_path / "today_plan.json"
+    base = UserPlan(preferred_time="16:30", duration_minutes=30)
+    proposal = Proposal.from_dict(_proposal("16:30"))
+    result = reminders.refresh_stale_approval(
+        base, proposal,
+        now=datetime.fromisoformat("2026-10-07T10:00"),
+        today_path=today_path,
+    )
+    assert result is None
+    assert not today_path.exists()  # nothing created before approval is due
+
+
 def test_ensure_proposal_reuses_regenerates_and_forces(tmp_path):
     proposal_path = tmp_path / "proposal.json"
     calls = []
@@ -318,6 +389,28 @@ def test_ensure_proposal_regenerates_on_new_day(tmp_path):
                               proposal_path=proposal_path, llm_fn=llm_fn)
     proposals.ensure_proposal(plan, None,
                               now=datetime.fromisoformat("2026-10-08T09:00"),
+                              proposal_path=proposal_path, llm_fn=llm_fn)
+    assert len(calls) == 2
+
+
+def test_ensure_proposal_regenerates_when_schedule_changes(tmp_path):
+    """A wizard change to the schedule must regenerate, same day, no --force."""
+    proposal_path = tmp_path / "proposal.json"
+    calls = []
+
+    def llm_fn(prompt):
+        calls.append(prompt)
+        return {"suggested_time": "16:30", "duration_minutes": 30, "reason": "x"}
+
+    now = datetime.fromisoformat("2026-10-07T09:00")
+    old = UserPlan(preferred_time="16:30", duration_minutes=30)
+    proposals.ensure_proposal(old, None, now=now,
+                              proposal_path=proposal_path, llm_fn=llm_fn)
+    assert len(calls) == 1
+
+    # same day, same weather, new schedule -> must not reuse
+    new = UserPlan(preferred_time="22:30", duration_minutes=240)
+    proposals.ensure_proposal(new, None, now=now,
                               proposal_path=proposal_path, llm_fn=llm_fn)
     assert len(calls) == 2
 

@@ -164,12 +164,17 @@ def make_plan(
         route_notes=str(llm.get("route_notes") or ""),
         source=Plan.SOURCE_LLM if llm else Plan.SOURCE_FALLBACK,
         created_at=clock.iso_now(now),
+        base_fingerprint=base_plan.fingerprint(),
     )
 
 
-def plan_is_valid(plan: Plan, weather: Weather | None, now: datetime) -> bool:
-    """Reuse only today's plan with unchanged conditions."""
+def plan_is_valid(
+    plan: Plan, base_plan: UserPlan, weather: Weather | None, now: datetime
+) -> bool:
+    """Reuse only today's plan with unchanged conditions *and* schedule."""
     if plan.for_date != clock.today_iso(now):
+        return False
+    if plan.base_fingerprint != base_plan.fingerprint():
         return False
     return plan.weather_fingerprint == weather_fingerprint(weather)
 
@@ -191,7 +196,7 @@ def ensure_plan(
     """
     now = now or clock.now()
     existing = read_record(plan_path, Plan.from_dict)
-    if existing and not force and plan_is_valid(existing, weather, now):
+    if existing and not force and plan_is_valid(existing, base_plan, weather, now):
         log.info("Reusing today's plan.")
         return existing
     preferred_time = proposal.suggested_time if proposal else base_plan.preferred_time

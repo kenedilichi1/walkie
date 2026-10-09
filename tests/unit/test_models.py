@@ -51,6 +51,52 @@ def test_user_plan_from_legacy_file_without_enums_as_plain_strings():
     assert plan.intensity is Intensity.RELAXED
 
 
+def test_user_plan_fingerprint_tracks_schedule_not_cosmetics():
+    """Changing any schedule input changes the fingerprint; quote does not."""
+    base = UserPlan(preferred_time="16:30", duration_minutes=30, area="Riverside")
+    same = UserPlan(
+        preferred_time="16:30",
+        duration_minutes=30,
+        area="Riverside",
+        quote="Different quote.",
+        created_at="2026-10-08T09:00:00",
+    )
+    assert base.fingerprint() == same.fingerprint()
+
+    assert base.fingerprint() != UserPlan(
+        preferred_time="17:00", duration_minutes=30, area="Riverside"
+    ).fingerprint()
+    assert base.fingerprint() != UserPlan(
+        preferred_time="16:30", duration_minutes=45, area="Riverside"
+    ).fingerprint()
+    assert base.fingerprint() != UserPlan(
+        preferred_time="16:30", duration_minutes=30, area="Hilltop"
+    ).fingerprint()
+    assert base.fingerprint() != UserPlan(
+        preferred_time="16:30",
+        duration_minutes=30,
+        location_type=LocationType.SUN,
+        area="Riverside",
+    ).fingerprint()
+    assert base.fingerprint() != UserPlan(
+        preferred_time="16:30",
+        duration_minutes=30,
+        intensity=Intensity.BRISK,
+        area="Riverside",
+    ).fingerprint()
+
+
+def test_proposal_and_plan_carry_base_fingerprint_roundtrip():
+    """The stored fingerprint survives a JSON roundtrip (Proposal + Plan)."""
+    proposal = Proposal(suggested_time="17:00", base_fingerprint="16:30|30|shade|moderate|")
+    assert Proposal.from_dict(proposal.to_dict()) == proposal
+    plan = Plan(window_start="17:00", base_fingerprint="16:30|30|shade|moderate|")
+    assert Plan.from_dict(plan.to_dict()) == plan
+    # a pre-fingerprint file loads with an empty one (treated as stale once)
+    assert Proposal.from_dict({}).base_fingerprint == ""
+    assert Plan.from_dict({}).base_fingerprint == ""
+
+
 def test_proposal_roundtrip():
     proposal = Proposal(
         suggested_time="17:00",

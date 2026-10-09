@@ -333,6 +333,8 @@ def run_setup() -> None:
     QMessageBox.information(
         None,
         "You're set!",
-        f"Plan saved to {config.USER_PLAN_PATH.name}.\n\n“{record.quote}”",
+        f"Plan saved to {config.USER_PLAN_PATH.name}.\n"
+        "Today's walk will update on the next run.\n\n"
+        f"“{record.quote}”",
     )
     log.info(f"Saved plan to {config.USER_PLAN_PATH}")
