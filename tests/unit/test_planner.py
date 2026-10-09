@@ -211,6 +211,31 @@ def test_ensure_plan_regenerates_on_new_day(tmp_path):
     assert len(calls) == 2
 
 
+def test_ensure_plan_archives_yesterday_into_history(tmp_path):
+    """A new day's plan keeps yesterday's in history, not the same-day one."""
+    plan_path = tmp_path / "plan.json"
+    base = UserPlan(preferred_time="13:00", duration_minutes=30)
+
+    def llm(prompt):
+        return {"window_start": "13:00", "duration_minutes": 30, "reason": "x"}
+
+    planner.ensure_plan(base, None, DAYLIGHT, now=NOW,
+                        plan_path=plan_path, llm_fn=llm)
+    assert not (tmp_path / "history").exists()  # nothing to keep yet
+
+    next_day = datetime.fromisoformat("2026-10-08T09:00")
+    planner.ensure_plan(base, None, DAYLIGHT, now=next_day,
+                        plan_path=plan_path, llm_fn=llm)
+    archived = tmp_path / "history" / "plan-2026-10-07.json"
+    assert archived.exists()
+    assert json.loads(archived.read_text())["for_date"] == "2026-10-07"
+
+    # a same-day --force-new must not pile into history
+    planner.ensure_plan(base, None, DAYLIGHT, now=next_day, force=True,
+                        plan_path=plan_path, llm_fn=llm)
+    assert not (tmp_path / "history" / "plan-2026-10-08.json").exists()
+
+
 def test_ensure_plan_regenerates_when_schedule_changes(tmp_path):
     """A wizard change to the schedule must regenerate, same day, no --force."""
     plan_path = tmp_path / "plan.json"
