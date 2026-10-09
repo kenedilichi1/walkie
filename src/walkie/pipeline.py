@@ -16,6 +16,7 @@ from pathlib import Path
 
 from walkie import clock, config
 from walkie.ai.planner import ensure_plan
+from walkie.card import write_card
 from walkie.daylight import daylight_advisory, daylight_for
 from walkie.log import get_logger
 from walkie.media.voice import Synth, build_walk_audio
@@ -42,6 +43,7 @@ class PipelinePaths:
     state: Path = config.REMINDER_STATE_PATH
     gpx: Path = config.DEFAULT_WALK_GPX
     audio: Path = config.WALK_AUDIO_PATH
+    card: Path = config.WALK_CARD_PATH
     route_cache: Path = config.CACHE_DIR / "routes"
 
 
@@ -150,6 +152,11 @@ def run(
             actions.append("voice: rebuilt")
         else:
             actions.append("voice: up-to-date")
+        if _stale(paths.card, (paths.plan, paths.gpx), force):
+            write_card(plan, gpx_path=paths.gpx, out_path=paths.card)
+            actions.append("card: written")
+        else:
+            actions.append("card: up-to-date")
     else:
         actions.append("route/voice: waiting for approval")
 

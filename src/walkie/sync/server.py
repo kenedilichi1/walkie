@@ -31,6 +31,10 @@ FILES: tuple[tuple[str, str], ...] = (
         str(config.WALK_AUDIO_PATH.relative_to(config.OUTPUT_DIR)),
         "voice cues (run: make voice)",
     ),
+    (
+        str(config.WALK_CARD_PATH.relative_to(config.OUTPUT_DIR)),
+        "shareable walk card (screenshot to share)",
+    ),
 )
 
 
