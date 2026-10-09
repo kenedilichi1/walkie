@@ -33,6 +33,8 @@ log = get_logger("voice")
 WALKING_SPEED_MPS = config.WALKING_SPEED_MPS
 TURN_THRESHOLD_DEG = 40.0
 MIN_TURN_SPACING_M = 15.0
+TURN_AHEAD_SECONDS = 15.0  # warn this long before each corner
+MIN_CUE_GAP_SECONDS = 5.0  # never place two cues this close together
 START_TEXT = "Start of your walk. Follow the route."
 FINISH_TEXT = "You have arrived. Walk complete."
 HF_BASE = "https://huggingface.co/rhasspy/piper-voices/resolve/main"
@@ -220,12 +222,20 @@ def briefing_text(plan: Plan | None) -> str | None:
 
 
 def plan_cues(walk: Walk, briefing: str | None = None) -> list[Cue]:
-    """Turn list -> timed spoken cues (start, turns, arrival).
+    """Turn list -> timed spoken cues (start, approach, turns, arrival).
 
-    The opening cue is the rich briefing when one is given, else START_TEXT.
+    Each turn gets an advance "ahead" cue a few seconds before the corner, so
+    you're warned the turn is coming rather than told as you reach it. The
+    opening cue is the rich briefing when one is given, else START_TEXT.
     """
     cues = [Cue(0.0, briefing or START_TEXT)]
-    cues.extend(Cue(t.at_seconds, t.instruction) for t in walk.turns)
+    for turn in walk.turns:
+        ahead_at = turn.at_seconds - TURN_AHEAD_SECONDS
+        # only warn when it clears the previous cue; a tight corner just
+        # gets the turn itself
+        if ahead_at - cues[-1].at_seconds >= MIN_CUE_GAP_SECONDS:
+            cues.append(Cue(ahead_at, f"{turn.instruction} ahead"))
+        cues.append(Cue(turn.at_seconds, turn.instruction))
     cues.append(Cue(float(walk.loop_seconds), FINISH_TEXT))
     return cues
 
