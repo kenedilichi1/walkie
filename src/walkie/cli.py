@@ -11,6 +11,7 @@
     walkie run [--force]              full pipeline (cron entry point)
     walkie serve [--port N]           serve today's files to your phone (LAN)
     walkie history [--limit N]        look back at past days' plans
+    walkie card [--gpx PATH]          build a shareable walk card
 """
 
 from __future__ import annotations
@@ -106,6 +107,14 @@ def build_parser() -> argparse.ArgumentParser:
     history_parser.add_argument(
         "--limit", type=int, default=30,
         help="how many past days to show (default: 30)",
+    )
+
+    card_parser = sub.add_parser(
+        "card", help="build a shareable card of today's walk -> output/card.html"
+    )
+    card_parser.add_argument(
+        "--gpx", type=Path, default=config.DEFAULT_WALK_GPX,
+        help="route to measure for the card (default: output/routes/walk.gpx)",
     )
     return parser
 
@@ -237,6 +246,16 @@ def cmd_history(args: argparse.Namespace) -> None:
         )
 
 
+def cmd_card(args: argparse.Namespace) -> None:
+    from walkie.card import write_card
+    from walkie.models import Plan
+    from walkie.storage import read_record
+
+    plan = read_record(config.PLAN_PATH, Plan.from_dict)
+    out = write_card(plan, gpx_path=args.gpx)
+    log.info(f"Open it in a browser (or via walkie serve): {out}")
+
+
 HANDLERS: dict[str, Callable[[argparse.Namespace], None]] = {
     "wizard": cmd_wizard,
     "region": cmd_region,
@@ -249,6 +268,7 @@ HANDLERS: dict[str, Callable[[argparse.Namespace], None]] = {
     "serve": cmd_serve,
     "run": cmd_run,
     "history": cmd_history,
+    "card": cmd_card,
 }
 
 

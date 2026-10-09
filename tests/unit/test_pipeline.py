@@ -56,6 +56,7 @@ def _run(tmp_path: Path, pbf: Path | None, *, today: bool, **kwargs):
         state=tmp_path / "reminder_state.json",
         gpx=tmp_path / "routes" / "walk.gpx",
         audio=tmp_path / "audio" / "walk_audio.mp3",
+        card=tmp_path / "card.html",
         route_cache=tmp_path / "cache" / "routes",
     )
     for path in (paths.plan, paths.gpx, paths.audio):
@@ -97,6 +98,16 @@ def test_run_with_approval_builds_route_and_voice(tmp_path):
     span = (points[-1].time - points[0].time).total_seconds()
     assert span == pytest.approx(11 * 60, abs=1)  # window from today_plan.json
     assert (tmp_path / "audio" / "walk_audio.mp3").stat().st_size > 0
+
+
+def test_run_writes_walk_card(tmp_path):
+    """An approved run writes a shareable card alongside route and voice."""
+    pbf = write_grid_pbf(tmp_path / "grid.osm.pbf")
+    actions = _run(tmp_path, pbf, today=True)
+    assert "card: written" in actions
+    card = tmp_path / "card.html"
+    assert card.exists()
+    assert "Today" in card.read_text(encoding="utf-8")
 
 
 def test_run_flags_walk_after_sunset(tmp_path):

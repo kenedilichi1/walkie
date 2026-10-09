@@ -34,6 +34,7 @@ PLAN_PATH = OUTPUT_DIR / "plans" / "plan.json"
 ROUTES_DIR = OUTPUT_DIR / "routes"
 WALK_AUDIO_PATH = OUTPUT_DIR / "audio" / "walk_audio.mp3"
 DEFAULT_WALK_GPX = ROUTES_DIR / "walk.gpx"
+WALK_CARD_PATH = OUTPUT_DIR / "card.html"
 
 DEFAULT_OLLAMA_HOST = "http://localhost:11434"
 DEFAULT_OLLAMA_MODEL = "llama3.2:3b"
