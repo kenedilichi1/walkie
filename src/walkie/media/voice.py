@@ -26,6 +26,7 @@ from gpxpy.gpx import GPXException
 from walkie import config
 from walkie.geo import haversine_m
 from walkie.log import get_logger
+from walkie.models import Plan
 
 log = get_logger("voice")
 
@@ -198,9 +199,32 @@ def parse_walk(gpx_path: Path) -> Walk:
     return Walk(turns, loop_s, total_m)
 
 
-def plan_cues(walk: Walk) -> list[Cue]:
-    """Turn list -> timed spoken cues (start, turns, arrival)."""
-    cues = [Cue(0.0, START_TEXT)]
+def briefing_text(plan: Plan | None) -> str | None:
+    """A spoken opening line drawn from the plan; None when there's nothing to say.
+
+    Built only from what the plan actually holds, so a sparse plan (no weather,
+    no area) still yields a sensible, short briefing instead of filler.
+    """
+    if plan is None:
+        return None
+    parts = [f"Walk at {plan.window_start}", f"{plan.duration_minutes} minutes"]
+    if plan.location_type.value != "any":
+        parts.append(f"{plan.location_type.value} route")
+    if plan.intensity.value:
+        parts.append(f"{plan.intensity.value} pace")
+    if plan.area:
+        parts.append(f"in {plan.area}")
+    if plan.weather_summary:
+        parts.append(f"Weather, {plan.weather_summary}")
+    return ". ".join(parts) + "."
+
+
+def plan_cues(walk: Walk, briefing: str | None = None) -> list[Cue]:
+    """Turn list -> timed spoken cues (start, turns, arrival).
+
+    The opening cue is the rich briefing when one is given, else START_TEXT.
+    """
+    cues = [Cue(0.0, briefing or START_TEXT)]
     cues.extend(Cue(t.at_seconds, t.instruction) for t in walk.turns)
     cues.append(Cue(float(walk.loop_seconds), FINISH_TEXT))
     return cues
@@ -334,10 +358,11 @@ def build_walk_audio(
     out_path: Path = config.WALK_AUDIO_PATH,
     voice_model: Path | None = None,
     synth: Synth | None = None,
+    plan: Plan | None = None,
 ) -> BuildResult:
     """walk.gpx -> output/audio/walk_audio.mp3 (spoken cues, no music)."""
     walk = parse_walk(gpx_path)
-    cues = plan_cues(walk)
+    cues = plan_cues(walk, briefing=briefing_text(plan))
     if synth is None:
         if voice_model is None:
             raise VoiceError("voice_model path required to synthesize cues")

@@ -189,9 +189,12 @@ def cmd_route(args: argparse.Namespace) -> None:
 
 def cmd_voice(args: argparse.Namespace) -> None:
     from walkie.media.voice import build_walk_audio
+    from walkie.models import Plan
+    from walkie.storage import read_record
 
     settings = config.load_settings()
-    build_walk_audio(args.gpx, voice_model=settings.voice_model)
+    plan = read_record(config.PLAN_PATH, Plan.from_dict)
+    build_walk_audio(args.gpx, voice_model=settings.voice_model, plan=plan)
 
 
 def cmd_remind(args: argparse.Namespace) -> None:

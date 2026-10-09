@@ -15,6 +15,7 @@ from walkie import config
 from walkie.media.voice import (
     AudioSpec,
     VoiceError,
+    briefing_text,
     build_walk_audio,
     encode_mp3,
     ensure_voice_model,
@@ -23,6 +24,7 @@ from walkie.media.voice import (
     render_cues,
     write_wav,
 )
+from walkie.models import Intensity, LocationType, Plan
 
 FIXTURE = Path(__file__).parent.parent / "fixtures" / "square_loop.gpx"
 SPEC = AudioSpec(sample_rate=22050, sample_width=2, channels=1)
@@ -82,6 +84,49 @@ def test_plan_cues_cover_start_turns_and_finish():
     assert [c.text for c in cues[1:-1]] == ["Turn right"] * 3
     assert cues[-1].at_seconds == walk.loop_seconds
     assert "arrived" in cues[-1].text
+
+
+def test_briefing_text_is_rich_and_sparse_is_short():
+    rich = Plan(
+        window_start="16:30",
+        duration_minutes=45,
+        location_type=LocationType.SHADE,
+        intensity=Intensity.BRISK,
+        area="Riverside",
+        weather_summary="light rain",
+    )
+    text = briefing_text(rich)
+    assert "16:30" in text
+    assert "45 minutes" in text
+    assert "shade" in text
+    assert "brisk" in text
+    assert "Riverside" in text
+    assert "light rain" in text
+
+    # a sparse plan still yields a sensible, short line (no filler)
+    sparse = briefing_text(Plan(window_start="09:00", duration_minutes=30))
+    assert "09:00" in sparse and "30 minutes" in sparse
+    assert "Riverside" not in sparse
+
+    assert briefing_text(None) is None
+
+
+def test_plan_cues_use_the_briefing_as_the_opening():
+    walk = parse_walk(FIXTURE)
+    cues = plan_cues(walk, briefing="Walk at 16:30. 45 minutes.")
+    assert cues[0].at_seconds == 0.0
+    assert cues[0].text == "Walk at 16:30. 45 minutes."
+    # no briefing -> the generic start line
+    assert plan_cues(walk)[0].text == "Start of your walk. Follow the route."
+
+
+def test_build_walk_audio_speaks_the_plan_briefing(tmp_path):
+    out = tmp_path / "walk_audio.mp3"
+    plan = Plan(window_start="16:30", duration_minutes=30,
+                location_type=LocationType.SHADE, intensity=Intensity.MODERATE)
+    result = build_walk_audio(FIXTURE, out_path=out, synth=stub_synth, plan=plan)
+    assert out.exists()
+    assert result.cues == 5  # opening briefing + 3 turns + finish
 
 
 def test_render_covers_loop_time_and_places_cues():
