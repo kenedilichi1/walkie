@@ -139,3 +139,23 @@ def test_start_server_missing_directory(tmp_path):
 def test_lan_ip_is_an_ip():
     ip = server.lan_ip()
     assert ip.count(".") == 3  # never raises; falls back to 127.0.0.1
+
+
+def test_serve_prints_qr_for_the_landing_url(tmp_path, monkeypatch):
+    """serve() renders a QR encoding http://<ip>:<port>/ so the phone can scan it."""
+    directory = _served_output(tmp_path)
+    seen: list[str] = []
+
+    def _capture(url: str) -> str:
+        seen.append(url)
+        return "QR"
+
+    monkeypatch.setattr(server, "qr_blocks", _capture)
+    # serve_forever would block; raise so serve() unwinds after logging
+    monkeypatch.setattr(
+        "http.server.ThreadingHTTPServer.serve_forever",
+        lambda self: (_ for _ in ()).throw(KeyboardInterrupt),
+    )
+    server.serve(directory, host="127.0.0.1", port=0)
+    assert seen and seen[0].startswith("http://127.0.0.1:")
+    assert seen[0].endswith("/")

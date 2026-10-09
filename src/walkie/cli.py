@@ -12,6 +12,7 @@
     walkie serve [--port N]           serve today's files to your phone (LAN)
     walkie history [--limit N]        look back at past days' plans
     walkie card [--gpx PATH]          build a shareable walk card
+    walkie qr [--url URL] [--port N]  print a QR that opens the sync page
 """
 
 from __future__ import annotations
@@ -115,6 +116,18 @@ def build_parser() -> argparse.ArgumentParser:
     card_parser.add_argument(
         "--gpx", type=Path, default=config.DEFAULT_WALK_GPX,
         help="route to measure for the card (default: output/routes/walk.gpx)",
+    )
+
+    qr_parser = sub.add_parser(
+        "qr", help="print a QR code that opens the sync page on your phone"
+    )
+    qr_parser.add_argument(
+        "--url",
+        help="URL to encode (default: guess from today's settings)",
+    )
+    qr_parser.add_argument(
+        "--port", type=int, default=8000,
+        help="port shown in the guessed URL (default: 8000)",
     )
     return parser
 
@@ -256,6 +269,15 @@ def cmd_card(args: argparse.Namespace) -> None:
     log.info(f"Open it in a browser (or via walkie serve): {out}")
 
 
+def cmd_qr(args: argparse.Namespace) -> None:
+    from walkie.sync.qr import qr_blocks
+    from walkie.sync.server import lan_ip
+
+    url = args.url or f"http://{lan_ip()}:{args.port}/"
+    print(qr_blocks(url))
+    log.info(f"Scan to open: {url}")
+
+
 HANDLERS: dict[str, Callable[[argparse.Namespace], None]] = {
     "wizard": cmd_wizard,
     "region": cmd_region,
@@ -269,6 +291,7 @@ HANDLERS: dict[str, Callable[[argparse.Namespace], None]] = {
     "run": cmd_run,
     "history": cmd_history,
     "card": cmd_card,
+    "qr": cmd_qr,
 }
 
 

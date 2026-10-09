@@ -20,6 +20,7 @@ dependencies = [
     "plyer",
     "pyyaml",
     "PyQt6",
+    "segno",
     "pyobjus; sys_platform == 'darwin'",
 ]
 
