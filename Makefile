@@ -1,6 +1,6 @@
 PYTHON := $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 
-.PHONY: setup region wizard suggest plan route voice remind daemon run serve history card qr schedule test lint typecheck clean
+.PHONY: setup region wizard suggest plan route voice remind daemon run serve history card qr schedule test lint typecheck gate clean
 
 setup:
 	bash scripts/setup_env.sh
@@ -55,6 +55,8 @@ lint:
 
 typecheck:
 	$(PYTHON) -m mypy src/walkie
+
+gate: lint typecheck test
 
 clean:
 	rm -rf output/* .pytest_cache
