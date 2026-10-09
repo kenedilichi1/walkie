@@ -94,6 +94,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--port", type=int, default=8000,
         help="port to listen on (default: 8000)",
     )
+    serve_parser.add_argument(
+        "--no-window", action="store_true",
+        help="serve in the terminal only (no PyQt window)",
+    )
 
     run_parser = sub.add_parser(
         "run", help="full pipeline: suggest -> plan -> remind -> route -> voice"
@@ -253,6 +257,14 @@ def cmd_daemon(args: argparse.Namespace) -> None:
 
 
 def cmd_serve(args: argparse.Namespace) -> None:
+    if not args.no_window:
+        try:
+            from walkie.ui.sync_window import run_serve_window
+
+            run_serve_window(port=args.port)
+            return
+        except ImportError as exc:
+            log.info(f"GUI unavailable ({exc}); serving in the terminal")
     from walkie.sync.server import serve
 
     serve(port=args.port)

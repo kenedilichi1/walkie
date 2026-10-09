@@ -35,6 +35,8 @@ ROUTES_DIR = OUTPUT_DIR / "routes"
 WALK_AUDIO_PATH = OUTPUT_DIR / "audio" / "walk_audio.mp3"
 DEFAULT_WALK_GPX = ROUTES_DIR / "walk.gpx"
 WALK_CARD_PATH = OUTPUT_DIR / "card.html"
+STREET_GRAPH_PATH = CACHE_DIR / "routes" / "streets.graphml"
+MAP_TILE_CACHE = CACHE_DIR / "map-tiles"
 
 DEFAULT_OLLAMA_HOST = "http://localhost:11434"
 DEFAULT_OLLAMA_MODEL = "llama3.2:3b"
