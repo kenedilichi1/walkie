@@ -15,6 +15,7 @@ from pathlib import Path
 from walkie import config
 from walkie.log import get_logger
 from walkie.sync import SyncError
+from walkie.sync.qr import qr_blocks
 
 log = get_logger("sync")
 
@@ -124,6 +125,8 @@ def serve(
         f"Serving {directory} — open on your phone (same Wi-Fi):"
     )
     log.info(f"  http://{ip}:{bound_port}/")
+    log.info("Scan this with your phone camera to open the page:")
+    log.info(qr_blocks(f"http://{ip}:{bound_port}/"))
     for rel, note in FILES:
         missing = "" if (directory / rel).exists() else "  [missing]"
         log.info(f"  http://{ip}:{bound_port}/{rel}  {note}{missing}")
