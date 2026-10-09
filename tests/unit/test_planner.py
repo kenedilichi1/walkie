@@ -211,6 +211,26 @@ def test_ensure_plan_regenerates_on_new_day(tmp_path):
     assert len(calls) == 2
 
 
+def test_ensure_plan_regenerates_when_schedule_changes(tmp_path):
+    """A wizard change to the schedule must regenerate, same day, no --force."""
+    plan_path = tmp_path / "plan.json"
+    calls = []
+
+    def llm_fn(prompt):
+        calls.append(prompt)
+        return {"window_start": "13:00", "duration_minutes": 30, "reason": "x"}
+
+    old = UserPlan(preferred_time="13:00", duration_minutes=30)
+    planner.ensure_plan(old, None, DAYLIGHT, now=NOW,
+                        plan_path=plan_path, llm_fn=llm_fn)
+    assert len(calls) == 1
+
+    new = UserPlan(preferred_time="18:00", duration_minutes=60)
+    planner.ensure_plan(new, None, DAYLIGHT, now=NOW,
+                        plan_path=plan_path, llm_fn=llm_fn)
+    assert len(calls) == 2
+
+
 def test_ensure_plan_rejects_drift_outside_window(tmp_path):
     """A model that ignores the shift limit gets dropped, not obeyed."""
     plan_path = tmp_path / "plan.json"

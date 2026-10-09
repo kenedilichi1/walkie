@@ -82,6 +82,23 @@ class UserPlan:
             "created_at": self.created_at,
         }
 
+    def fingerprint(self) -> str:
+        """Stable id of the walk *schedule* (not quote/timestamp).
+
+        Derived records (proposal, plan, today's approval) store this so a
+        wizard change to any schedule input invalidates them and they get
+        regenerated on the next run — no manual --force-new needed.
+        """
+        return "|".join(
+            (
+                self.preferred_time,
+                str(self.duration_minutes),
+                self.location_type.value,
+                self.intensity.value,
+                self.area,
+            )
+        )
+
 
 @dataclass(frozen=True)
 class Weather:
@@ -166,6 +183,7 @@ class Proposal:
     created_at: str = ""
     approve_by: str = ""
     for_date: str = ""  # the day the proposal targets (YYYY-MM-DD)
+    base_fingerprint: str = ""  # UserPlan.fingerprint() it was built from
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Proposal:
@@ -186,6 +204,7 @@ class Proposal:
             created_at=_str(data.get("created_at")),
             approve_by=_str(data.get("approve_by")),
             for_date=_str(data.get("for_date")),
+            base_fingerprint=_str(data.get("base_fingerprint")),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -245,6 +264,7 @@ class Plan:
     route_notes: str = ""
     source: str = SOURCE_FALLBACK  # llm | fallback
     created_at: str = ""
+    base_fingerprint: str = ""  # UserPlan.fingerprint() it was built from
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Plan:
@@ -269,6 +289,7 @@ class Plan:
             route_notes=_str(data.get("route_notes")),
             source=_str(data.get("source"), cls.SOURCE_FALLBACK),
             created_at=_str(data.get("created_at")),
+            base_fingerprint=_str(data.get("base_fingerprint")),
         )
 
     def to_dict(self) -> dict[str, Any]:

@@ -33,13 +33,17 @@ def _settings(tmp_path: Path, pbf: Path | None) -> config.Settings:
     )
 
 
-def _today_plan(path: Path, when: str = "16:30", minutes: int = 11) -> None:
+def _today_plan(path: Path, base_plan: UserPlan | None = None,
+                when: str = "16:30", minutes: int = 11) -> None:
+    """An approval already in place; stamped with the schedule it came from."""
+    base_plan = base_plan or UserPlan(preferred_time="16:30", duration_minutes=30)
     write_json(
         path,
         {
             "for_date": date.today().isoformat(),
             "suggested_time": when,
             "duration_minutes": minutes,
+            "base_fingerprint": base_plan.fingerprint(),
         },
     )
 
@@ -56,12 +60,12 @@ def _run(tmp_path: Path, pbf: Path | None, *, today: bool, **kwargs):
     )
     for path in (paths.plan, paths.gpx, paths.audio):
         path.parent.mkdir(parents=True, exist_ok=True)
+    kwargs.setdefault("base_plan", UserPlan(preferred_time="16:30", duration_minutes=30))
     if today and not paths.today.exists():
-        _today_plan(paths.today)
+        _today_plan(paths.today, kwargs["base_plan"])
     kwargs.setdefault("llm_fn", lambda _prompt: {})
     kwargs.setdefault("load_weather_fn", lambda: None)
     kwargs.setdefault("synth", FAKE_SYNTH)
-    kwargs.setdefault("base_plan", UserPlan(preferred_time="16:30", duration_minutes=30))
     return run(settings=_settings(tmp_path, pbf), paths=paths, **kwargs)
 
 
@@ -132,6 +136,24 @@ def test_run_rebuilds_route_when_today_plan_edited(tmp_path):
     actions = _run(tmp_path, pbf, today=True)
     assert "route: rebuilt" in actions
     assert "voice: rebuilt" in actions  # cascade: gpx changed
+
+
+def test_run_rebuilds_when_schedule_changes(tmp_path):
+    """Changing the schedule updates today's approval and rebuilds route."""
+    pbf = write_grid_pbf(tmp_path / "grid.osm.pbf")
+    old = UserPlan(preferred_time="16:30", duration_minutes=30)
+    _run(tmp_path, pbf, today=True, base_plan=old)
+    assert read_json(tmp_path / "today_plan.json")["suggested_time"] == "16:30"
+
+    # wizard saves a new schedule -> next run must follow it, no --force
+    new = UserPlan(preferred_time="09:00", duration_minutes=45)
+    actions = _run(tmp_path, pbf, today=True, base_plan=new)
+    assert "approval: refreshed for new schedule" in actions
+    today = read_json(tmp_path / "today_plan.json")
+    assert today["suggested_time"] == "09:00"
+    assert today["duration_minutes"] == 45
+    assert "route: rebuilt" in actions  # approval rewrite cascades to route
+    assert "voice: rebuilt" in actions
 
 
 def test_run_fires_quote_notification_when_due(tmp_path, monkeypatch):

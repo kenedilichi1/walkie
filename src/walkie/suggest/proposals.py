@@ -85,18 +85,23 @@ def make_proposal(
         created_at=clock.iso_now(now),
         approve_by=approve_by.isoformat(timespec="minutes"),
         for_date=clock.today_iso(now),
+        base_fingerprint=base_plan.fingerprint(),
     )
 
 
 def proposal_is_valid(
-    proposal: Proposal, weather: Weather | None, now: datetime
+    proposal: Proposal, base_plan: UserPlan, weather: Weather | None, now: datetime
 ) -> bool:
-    """Reuse only today's proposal with unchanged conditions.
+    """Reuse only today's proposal with unchanged conditions *and* schedule.
 
     Deliberately ignores approve_by: a proposal created after its own walk
-    time stays valid for the day instead of regenerating on every run.
+    time stays valid for the day instead of regenerating on every run. The
+    fingerprint check is what makes a wizard schedule change take effect on
+    the next run instead of waiting until tomorrow.
     """
     if proposal.for_date != clock.today_iso(now):
+        return False
+    if proposal.base_fingerprint != base_plan.fingerprint():
         return False
     return proposal.weather_fingerprint == weather_fingerprint(weather)
 
@@ -116,7 +121,7 @@ def ensure_proposal(
     """
     now = now or clock.now()
     existing = read_record(proposal_path, Proposal.from_dict)
-    if existing and not force and proposal_is_valid(existing, weather, now):
+    if existing and not force and proposal_is_valid(existing, base_plan, weather, now):
         log.info("Reusing today's proposal.")
         return existing
     prompt = build_prompt(base_plan, weather)
