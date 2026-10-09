@@ -99,6 +99,22 @@ def test_run_with_approval_builds_route_and_voice(tmp_path):
     assert (tmp_path / "audio" / "walk_audio.mp3").stat().st_size > 0
 
 
+def test_run_flags_walk_after_sunset(tmp_path):
+    """An evening walk past sunset gets a daylight advisory line."""
+    pbf = write_grid_pbf(tmp_path / "grid.osm.pbf")
+    evening = UserPlan(preferred_time="21:30", duration_minutes=30)
+    actions = _run(tmp_path, pbf, today=False, base_plan=evening)
+    advisory = [a for a in actions if a.startswith("daylight: ")]
+    assert advisory and "after sunset" in advisory[0]
+
+
+def test_run_no_advisory_for_daylight_walk(tmp_path):
+    """A mid-day walk (well within sunrise/sunset) gets no advisory."""
+    pbf = write_grid_pbf(tmp_path / "grid.osm.pbf")
+    actions = _run(tmp_path, pbf, today=False)
+    assert not any(a.startswith("daylight: ") for a in actions)
+
+
 def test_run_waits_for_approval_despite_yesterdays_file(tmp_path):
     """A leftover approval from yesterday must not unlock route/voice."""
     pbf = write_grid_pbf(tmp_path / "grid.osm.pbf")

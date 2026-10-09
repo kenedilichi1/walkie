@@ -16,7 +16,7 @@ from pathlib import Path
 
 from walkie import clock, config
 from walkie.ai.planner import ensure_plan
-from walkie.daylight import daylight_for
+from walkie.daylight import daylight_advisory, daylight_for
 from walkie.log import get_logger
 from walkie.media.voice import Synth, build_walk_audio
 from walkie.models import UserPlan, Weather
@@ -90,6 +90,10 @@ def run(
     actions.append(
         f"plan {plan.window_start}-{plan.window_end} ({plan.duration_minutes} min)"
     )
+
+    advisory = daylight_advisory(plan.window_start, plan.window_end, daylight)
+    if advisory:
+        actions.append(f"daylight: {advisory}")
 
     # A schedule change replaces today's approval so route/voice follow.
     if refresh_stale_approval(base_plan, proposal, now, paths.today):
