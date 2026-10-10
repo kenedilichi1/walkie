@@ -169,6 +169,7 @@ make lint        # ruff
 make typecheck   # mypy --strict
 ```
 
+- [docs/architecture.md](docs/architecture.md): the design architecture — components, data flow and decisions
 - [docs/build_logic.md](docs/build_logic.md): how the steps connect
 - [docs/test_protocol.md](docs/test_protocol.md): the test plan for each step
 - [TEST_LOG.md](TEST_LOG.md): the field-testing log
