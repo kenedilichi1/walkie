@@ -171,6 +171,10 @@ def test_fetch_tile_reads_from_cache_without_network(tmp_path):
     assert fetch_tile(tmp_path, 16, 34000, 26000) == b"fake-png-bytes"
 
 
-def test_fetch_tile_returns_none_when_offline(tmp_path):
-    # No cache and no network -> None (caller falls back), never raises.
+def test_fetch_tile_returns_none_when_offline(tmp_path, monkeypatch):
+    # Unreachable tile server -> None (caller falls back), never raises.
+    # A closed port on localhost keeps this deterministic on any machine.
+    from walkie.sync import preview
+
+    monkeypatch.setattr(preview, "TILE_URL", "http://127.0.0.1:9/{z}/{x}/{y}.png")
     assert fetch_tile(tmp_path, 16, 34000, 26000, timeout=0.2) is None

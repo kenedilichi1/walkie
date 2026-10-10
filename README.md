@@ -52,22 +52,24 @@ The open pieces it's built on:
 - Optional: **[OsmAnd](https://osmand.net)** on your phone (free) to follow the
   route, with the phone on the same WiFi as your laptop
 
-## Setup (once)
+## Quick start
 
 ```bash
-make setup    # installs everything, downloads the AI model and your region's map
-make wizard   # a short window where you set your walk preferences
+make
 ```
 
-`make setup` finds your region from your internet connection. If it picks the
-wrong one, run `make region` to try again.
+That is the whole interface. The first time it installs everything, downloads
+your region's map, opens a short window for your walk preferences, builds
+today's walk and starts the phone server. Every later day the same command
+rebuilds only what has changed and serves the result — `make` and a bare
+`walkie` both mean `walkie go`.
 
-## Everyday use
+Useful variations:
 
-```bash
-make run      # plan today's walk, build the route and the audio
-make serve    # share today's files with your phone over WiFi
-```
+- Wrong region detected? `make region`
+- Change your walk preferences? `make wizard`
+- Already set up, just rebuild? `make run`
+- Serve files only? `make serve`
 
 `make serve` prints an address like `http://192.168.1.20:8000/` and a QR
 code — scan it with your phone camera to open the page. You can download:
@@ -96,6 +98,7 @@ you can also type `walkie <command>` directly.
 
 | Command | What it does |
 | --- | --- |
+| `make` (or `walkie go`) | **The one command:** fill any setup gaps, build today's walk, serve it (`--build-only`, `--force`, `--port N`) |
 | `make setup` | Install dependencies, the AI model and your region's map |
 | `make wizard` | Set or change your walk preferences |
 | `make region` | Detect your location again and download its map |

@@ -17,9 +17,11 @@ rejected and the walk stays at 21:30 / 30 min.
       network for a while — the cache at `cache/weather_today.json` is what
       the trailhead falls back to)
 - [ ] OsmAnd: area map downloaded for offline use
-- [ ] `walkie serve` → phone downloads `routes/walk.gpx` (+ `audio/walk_audio.mp3`)
+- [x] `walkie serve` → phone downloads `routes/walk.gpx` (+ `audio/walk_audio.mp3`)
+      — 2026-10-10, `GET /routes/walk.gpx 200` in serve log
 - [ ] Voice cues play locally (`afplay output/audio/walk_audio.mp3` or your player)
-- [ ] Notification permission granted for the terminal/walkie app
+- [x] Notification permission granted for the terminal/walkie app — banners
+      visible 2026-10-10 (walk approved / walk at 17:30)
 - [ ] Optional cron installed:
       `* * * * * cd <repo> && .venv/bin/walkie run >> output/cron.log 2>&1`
 
@@ -44,7 +46,7 @@ Airplane mode OFF again when done.
 
 | Date | Loop / route | Duration | Screen time (min) | Cues matched turns? | Issues | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| | | | target < 2 | | | |
+| 2026-10-10 | Home loop, 1784 m (Abakaliki), built via `make route` | 20 min, 17:30 auto-approved | n/a this walk — screen stayed on OsmAnd for screen recording, not app use | n/a — used OsmAnd's own nav cues instead | Wizard sets the schedule but the route does not exist until `make route`/`make run` — a fresh user has no way to know that | OsmAnd's offline navigation + voice guide covered turn-by-turn; walkie's audio cues not needed this walk. Phone fetched `walk.gpx` over WiFi (serve log 200). Notifications fired with quotes |
 
 Screen time: iOS Screen Time / Android Digital Wellbeing over the walk window
 (or stopwatch per unlock). Target: unlock once at the trailhead, then audio
