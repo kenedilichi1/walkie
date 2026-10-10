@@ -7,8 +7,8 @@ plans each day's walk for you: it picks the best time around the weather and
 daylight, builds a walking loop from your door, and turns the directions into
 spoken cues. Then you put the phone in your pocket and go.
 
-Everything runs on your own laptop with open-source AI. After setup it works
-with no internet connection.
+Everything runs on your own laptop with open-source AI. After setup, planning
+and building a walk need no internet connection.
 
 ## How a day with walkie works
 
@@ -58,11 +58,11 @@ The open pieces it's built on:
 make
 ```
 
-That is the whole interface. The first time it installs everything, downloads
-your region's map, opens a short window for your walk preferences, builds
-today's walk and starts the phone server. Every later day the same command
-rebuilds only what has changed and serves the result — `make` and a bare
-`walkie` both mean `walkie go`.
+That is the whole interface. The first time (internet required) it installs
+everything, downloads your region's map, opens a short window for your walk
+preferences, builds today's walk and starts the phone server. Every later day
+the same command rebuilds only what has changed and serves the result —
+`make` and a bare `walkie` both mean `walkie go`.
 
 Useful variations:
 
@@ -71,8 +71,10 @@ Useful variations:
 - Already set up, just rebuild? `make run`
 - Serve files only? `make serve`
 
-`make serve` prints an address like `http://192.168.1.20:8000/` and a QR
-code — scan it with your phone camera to open the page. You can download:
+`make serve` opens a window with a QR code, a map of today's loop and the
+file list. Scan the QR with your phone camera (phone on the same WiFi);
+`walkie serve --no-window` does the same from the terminal. Your phone can
+download:
 
 - `walk.gpx`: the route. Open it in OsmAnd.
 - `walk_audio.mp3`: the spoken turn cues.
@@ -87,30 +89,36 @@ only rebuilds what has changed, so running it every minute is cheap.
 * * * * * cd /path/to/walkie && .venv/bin/walkie run >> output/cron.log 2>&1
 ```
 
+Prefer a background service over cron? `walkie daemon` does the same job as
+a long-running process, and `walkie daemon --install` starts it at login
+(macOS launchd).
+
 **Change your schedule anytime.** `walkie schedule --time 16:30 --duration 45`
 updates when and how long you walk; today's walk rebuilds around it on the
 next run.
 
 ## Commands
 
-Every `make` target runs `python -m walkie <command>`. After `pip install -e .`
-you can also type `walkie <command>` directly.
+Each `make` target maps to one `walkie <command>` (exceptions: `make setup`
+runs the install script; `test`/`lint`/`typecheck` are dev tools). After
+`pip install -e .` you can type `walkie <command>` directly — that is also
+how you pass flags, since `make` targets take none.
 
 | Command | What it does |
 | --- | --- |
-| `make` (or `walkie go`) | **The one command:** fill any setup gaps, build today's walk, serve it (`--build-only`, `--force`, `--port N`) |
+| `make` (or `walkie go`) | **The one command:** fill any setup gaps, build today's walk, serve it (flags: `walkie go --build-only`, `--force`, `--port N`) |
 | `make setup` | Install dependencies, the AI model and your region's map |
 | `make wizard` | Set or change your walk preferences |
 | `make region` | Detect your location again and download its map |
-| `make run` | Do everything below in one go (use `--force` to rebuild all) |
+| `make run` | Run the whole pipeline: suggest → plan → route → voice → card (`walkie run --force` rebuilds everything) |
 | `make suggest` | Suggest today's walk time (`walkie suggest --edit` to adjust it) |
 | `make plan` | Let the AI finalise today's plan |
-| `make route` | Build the walking loop (`--minutes N` to change its length) |
+| `make route` | Build the walking loop (`walkie route --minutes N` to change its length) |
 | `make voice` | Turn the route into spoken cues |
 | `make remind` | Send any reminder that's due, then exit |
-| `make daemon` | Keep sending reminders until today's walk is approved |
-| `make serve` | Share today's files with your phone (`--port N` to change the port) |
-| `make history` | Look back at past days' plans (`--limit N` to change how many) |
+| `make daemon` | Background service: keeps today's walk current and sends reminders (`walkie daemon --install` to start at login) |
+| `make serve` | Share today's files with your phone (`walkie serve --port N`, `--no-window`) |
+| `make history` | Look back at past days' plans (`walkie history --limit N` to change how many) |
 | `make card` | Build a shareable card of today's walk (`output/card.html`) |
 | `make qr` | Print a QR code that opens the sync page on your phone |
 | `make schedule` | View or change your walk schedule (e.g. `walkie schedule --time 16:30 --duration 45`) |
@@ -138,6 +146,7 @@ these:
 | Setup | Your IP address, to an IP-location service, plus a reverse-geocode lookup on OpenStreetMap | To find your region |
 | Setup | Downloads from Geofabrik, Ollama and Hugging Face | The map, the AI model and the voice |
 | Daily, when online | Your coordinates, to [Open-Meteo](https://open-meteo.com) (no account) | The weather forecast. When you're offline, walkie uses the last saved one. |
+| When the serve window is open | Map preview tiles from [OpenStreetMap](https://www.openstreetmap.org) | Drawing the map behind the route (tiles are cached; without them the window still works) |
 
 ## Project layout
 
@@ -152,6 +161,8 @@ walkie/
 │   ├── routing/   builds the walking loop from the map
 │   ├── media/     turns the route into spoken cues
 │   ├── sync/      notifications, the phone server and the QR code
+│   ├── go.py      the one-command entry (make / walkie go)
+│   ├── daemon.py  background service (walkie daemon)
 │   ├── card.py    the shareable walk card
 │   ├── schedule.py view/change your walk schedule from the CLI
 │   ├── autoschedule.py plan your first walk during setup
