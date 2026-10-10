@@ -32,7 +32,7 @@ flowchart LR
     meteo -.->|"forecast (cached)"| walkie
     geo -.->|"map + model (one-time)"| walkie
     tiles -.->|serve window| walkie
-    out --|"HTTP on home WiFi"| page
+    out -->|"HTTP on home WiFi"| page
 ```
 
 Everything in the dotted box is optional after setup: when the internet is
