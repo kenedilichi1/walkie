@@ -1,5 +1,6 @@
 """walkie command line — the only module that parses argv and exits.
 
+walkie [go] [--build-only ...]   fill setup gaps, build today's walk, serve it
 walkie wizard                     one-time setup wizard
 walkie region [--dry-run ...]     detect location, fetch OSM extract
 walkie suggest [--edit|--force]   build today's walk proposal
@@ -19,6 +20,7 @@ walkie schedule [--time ...]      view or change your walk schedule
 from __future__ import annotations
 
 import argparse
+import sys
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
@@ -37,6 +39,32 @@ def build_parser() -> argparse.ArgumentParser:
         description="Offline-first walking planner with local AI suggestions.",
     )
     sub = parser.add_subparsers(dest="command", required=True)
+
+    go_parser = sub.add_parser(
+        "go",
+        help="one command: fill setup gaps, build today's walk, serve it",
+    )
+    go_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="regenerate proposal, plan, route and voice even if fresh",
+    )
+    go_parser.add_argument(
+        "--build-only",
+        action="store_true",
+        help="build today's walk and exit (skip the phone server)",
+    )
+    go_parser.add_argument(
+        "--no-window",
+        action="store_true",
+        help="serve in the terminal only (no PyQt window)",
+    )
+    go_parser.add_argument(
+        "--port",
+        type=int,
+        default=8000,
+        help="port to listen on (default: 8000)",
+    )
 
     sub.add_parser("wizard", help="one-time setup wizard (PyQt)")
 
@@ -290,18 +318,37 @@ def cmd_daemon(args: argparse.Namespace) -> None:
     run_daemon(check_interval=args.interval)
 
 
-def cmd_serve(args: argparse.Namespace) -> None:
-    if not args.no_window:
+def _serve_files(port: int, no_window: bool) -> None:
+    """Share today's files on the LAN; GUI window unless --no-window."""
+    if not no_window:
         try:
             from walkie.ui.sync_window import run_serve_window
 
-            run_serve_window(port=args.port)
+            run_serve_window(port=port)
             return
         except ImportError as exc:
             log.info(f"GUI unavailable ({exc}); serving in the terminal")
     from walkie.sync.server import serve
 
-    serve(port=args.port)
+    serve(port=port)
+
+
+def cmd_serve(args: argparse.Namespace) -> None:
+    _serve_files(port=args.port, no_window=args.no_window)
+
+
+def cmd_go(args: argparse.Namespace) -> None:
+    """The busy-human command: fill gaps, build, serve."""
+    from walkie import go as go_mod
+    from walkie.pipeline import run
+
+    go_mod.prepare()
+    for action in run(force=args.force):
+        log.info(action)
+    if args.build_only:
+        log.info("Built — serve it any time with: walkie serve")
+        return
+    _serve_files(port=args.port, no_window=args.no_window)
 
 
 def cmd_run(args: argparse.Namespace) -> None:
@@ -375,6 +422,7 @@ def cmd_schedule(args: argparse.Namespace) -> None:
 
 
 HANDLERS: dict[str, Callable[[argparse.Namespace], None]] = {
+    "go": cmd_go,
     "wizard": cmd_wizard,
     "region": cmd_region,
     "suggest": cmd_suggest,
@@ -395,6 +443,9 @@ HANDLERS: dict[str, Callable[[argparse.Namespace], None]] = {
 def main(argv: Sequence[str] | None = None) -> int:
     """Run one command; exit codes live only here (0 ok, 1 error, 130 INT)."""
     setup()
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if not argv:
+        argv = ["go"]  # bare `walkie` is the daily command
     args = build_parser().parse_args(argv)
     try:
         HANDLERS[args.command](args)

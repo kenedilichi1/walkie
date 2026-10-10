@@ -1,6 +1,20 @@
-PYTHON := $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
+# Recursively expanded so a venv created while building `go` is picked up.
+PYTHON = $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 
-.PHONY: setup region wizard suggest plan route voice remind daemon run serve history card qr schedule test lint typecheck gate clean
+.DEFAULT_GOAL := go
+
+.PHONY: go setup region wizard suggest plan route voice remind daemon run serve history card qr schedule test lint typecheck gate clean
+
+# --- everyday ---------------------------------------------------------------
+
+go: .venv/bin/python
+	$(PYTHON) -m walkie go
+
+# First-run bootstrap only: creates .venv, so later goals use it.
+.venv/bin/python:
+	bash scripts/setup_env.sh
+
+# --- one-time setup ---------------------------------------------------------
 
 setup:
 	bash scripts/setup_env.sh
@@ -10,6 +24,8 @@ region:
 
 wizard:
 	$(PYTHON) -m walkie wizard
+
+# --- pipeline pieces (mostly for debugging) ---------------------------------
 
 suggest:
 	$(PYTHON) -m walkie suggest
@@ -26,6 +42,14 @@ voice:
 remind:
 	$(PYTHON) -m walkie remind
 
+card:
+	$(PYTHON) -m walkie card
+
+qr:
+	$(PYTHON) -m walkie qr
+
+# --- automation and sharing -------------------------------------------------
+
 daemon:
 	$(PYTHON) -m walkie daemon
 
@@ -38,14 +62,10 @@ run:
 history:
 	$(PYTHON) -m walkie history
 
-card:
-	$(PYTHON) -m walkie card
-
-qr:
-	$(PYTHON) -m walkie qr
-
 schedule:
 	$(PYTHON) -m walkie schedule
+
+# --- development ------------------------------------------------------------
 
 test:
 	$(PYTHON) -m pytest -q --cov=walkie --cov-fail-under=84
