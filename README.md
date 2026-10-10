@@ -67,7 +67,8 @@ the same command rebuilds only what has changed and serves the result —
 Useful variations:
 
 - Wrong region detected? `make region`
-- Change your walk preferences? `make wizard`
+- Change your usual walk time, length or pace? `make wizard` — only needed
+  occasionally; for a quick tweak use `walkie schedule --time 17:00 --duration 45`
 - Already set up, just rebuild? `make run`
 - Serve files only? `make serve`
 
@@ -137,7 +138,7 @@ how you pass flags, since `make` targets take none.
 | --- | --- |
 | `make` (or `walkie go`) | **The one command:** fill any setup gaps, build today's walk, serve it (flags: `walkie go --build-only`, `--force`, `--port N`) |
 | `make setup` | Install dependencies, the AI model and your region's map |
-| `make wizard` | Set or change your walk preferences |
+| `make wizard` | Set your standing walk preferences (occasional — quick tweaks go through `walkie schedule`) |
 | `make region` | Detect your location again and download its map |
 | `make run` | Run the whole pipeline: suggest → plan → route → voice → card (`walkie run --force` rebuilds everything) |
 | `make suggest` | Suggest today's walk time (`walkie suggest --edit` to adjust it) |
