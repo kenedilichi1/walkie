@@ -99,23 +99,32 @@ next run.
 
 ### The flow at a glance
 
+First run — one time only:
+
 ```mermaid
-flowchart TD
-    make["make"] --> ready{Setup done?}
-    ready -->|First run| install["Install dependencies<br/>and the AI model"]
-    install --> region["Detect your region<br/>and download the map"]
-    region --> wizard["Wizard: your walk<br/>time, length, pace"]
-    wizard --> build
-    ready -->|Every later day| build["Build today's walk<br/>plan → route → audio → card"]
-    build --> serve["Serve over WiFi:<br/>QR code + files"]
-    serve --> phone["Phone downloads<br/>walk.gpx + audio"]
-    phone --> osmand["Open the route in OsmAnd,<br/>start the cues"]
-    osmand --> outside["Walk.<br/>Phone stays in your pocket."]
-    auto["Optional: cron or<br/>walkie daemon --install"] -.->|"keeps today's<br/>walk current"| build
+flowchart LR
+    make["make"] --> install["Install deps<br/>+ AI model"]
+    install --> region["Detect region<br/>download map"]
+    region --> wizard["Wizard:<br/>your preferences"]
+    wizard --> first["Today's walk built,<br/>serve window open"]
 ```
 
-One command covers the whole diagram: `make` on day one fills every gap in
-order; on ordinary days the same command only rebuilds what changed.
+Every day after — the same `make`, or cron/daemon doing it for you:
+
+```mermaid
+flowchart TD
+    trigger["make · cron · daemon"] --> proposal["Today's proposal:<br/>best time from weather + daylight + AI"]
+    proposal --> remind["Reminder before the walk<br/>notification + a quote"]
+    remind --> adjust{Want a different<br/>time or length?}
+    adjust -->|"Yes — adjust dialog"| rebuilt["Plan updates;<br/>route rebuilds"]
+    adjust -->|"No action — default is go"| approve["Auto-approved<br/>at walk time"]
+    rebuilt --> build
+    approve --> build["Route + audio built<br/>from the offline map"]
+    build --> serve["Serve over WiFi:<br/>QR code + files"]
+    serve --> phone["Phone downloads<br/>walk.gpx + audio"]
+    phone --> walk["OsmAnd + spoken cues.<br/>Walk. Phone in your pocket."]
+    walk --> history["Archived — look back<br/>with walkie history"]
+```
 
 ## Commands
 
