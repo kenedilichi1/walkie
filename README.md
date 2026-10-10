@@ -97,6 +97,26 @@ a long-running process, and `walkie daemon --install` starts it at login
 updates when and how long you walk; today's walk rebuilds around it on the
 next run.
 
+### The flow at a glance
+
+```mermaid
+flowchart TD
+    make["make"] --> ready{Setup done?}
+    ready -->|First run| install["Install dependencies<br/>and the AI model"]
+    install --> region["Detect your region<br/>and download the map"]
+    region --> wizard["Wizard: your walk<br/>time, length, pace"]
+    wizard --> build
+    ready -->|Every later day| build["Build today's walk<br/>plan → route → audio → card"]
+    build --> serve["Serve over WiFi:<br/>QR code + files"]
+    serve --> phone["Phone downloads<br/>walk.gpx + audio"]
+    phone --> osmand["Open the route in OsmAnd,<br/>start the cues"]
+    osmand --> outside["Walk.<br/>Phone stays in your pocket."]
+    auto["Optional: cron or<br/>walkie daemon --install"] -.->|"keeps today's<br/>walk current"| build
+```
+
+One command covers the whole diagram: `make` on day one fills every gap in
+order; on ordinary days the same command only rebuilds what changed.
+
 ## Commands
 
 Each `make` target maps to one `walkie <command>` (exceptions: `make setup`
